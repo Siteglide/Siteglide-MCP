@@ -1,0 +1,32 @@
+{
+  "name": "@siteglide/siteglide-mcp",
+  "version": "0.1.0",
+  "description": "Siteglide MCP server — compose platformOS validate_code with Siteglide rules and ops tools",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "siteglide-mcp": "./bin/siteglide-mcp.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node bin/siteglide-mcp.js",
+    "test": "node --test test/**/*.test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@platformos/platformos-check-node": "^0.0.20",
+    "@platformos/platformos-mcp-supervisor": "^0.0.2",
+    "zod": "^3.23.8"
+  },
+  "license": "MIT",
+  "files": [
+    "bin",
+    "src"
+  ]
+}
