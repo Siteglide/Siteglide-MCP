@@ -22,11 +22,13 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@platformos/platformos-check-node": "^0.0.20",
     "@platformos/platformos-mcp-supervisor": "^0.0.2",
+    "@siteglide/siteglide-cli": "file:../siteglide-cli",
     "zod": "^3.23.8"
   },
   "license": "MIT",
   "files": [
     "bin",
-    "src"
+    "src",
+    "test"
   ]
 }

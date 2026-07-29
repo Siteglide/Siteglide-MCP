@@ -1,13 +1,23 @@
 import { z } from 'zod';
 import { listEnvironments, resolveAuth, siteglideApi } from './client.js';
+import {
+  classifyEnvironment,
+  hostnameFromUrl,
+  isGraphQLMutation,
+  wrapUntrustedResult,
+  truncatePreview,
+  assertPayloadSize
+} from './security.js';
+import { elicitProductionMutationConfirm } from './elicitConfirm.js';
 
 function toolResult(data) {
   return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
 }
 
 function toolError(error) {
+  const message = error?.message || String(error);
   return {
-    content: [{ type: 'text', text: JSON.stringify({ error: error.message }, null, 2) }],
+    content: [{ type: 'text', text: JSON.stringify({ error: message }, null, 2) }],
     isError: true
   };
 }
@@ -23,14 +33,21 @@ export function registerOpsTools(server, opts = {}) {
   server.registerTool(
     'envs_list',
     {
-      description: 'List Siteglide environments from .siteglide-config (or CONFIG_FILE_PATH).',
+      description:
+        'List Siteglide environments from .siteglide-config (or CONFIG_FILE_PATH). ' +
+        'Agents MUST call with details: true before env-scoped ops. ' +
+        'Returns name, host, and when details=true also url + classification ("staging"|"production"). Never returns tokens or emails.',
       inputSchema: {
-        unused: z.boolean().optional().describe('Unused; reserved for future filters.')
+        details: z
+          .boolean()
+          .optional()
+          .describe('When true, include url and classification for each environment. Agents must use details: true.')
       }
     },
-    async () => {
+    async (args) => {
       try {
-        return toolResult({ environments: listEnvironments(configPath) });
+        const details = Boolean(args?.details);
+        return toolResult({ environments: listEnvironments(configPath, { details }) });
       } catch (error) {
         return toolError(error);
       }
@@ -40,7 +57,11 @@ export function registerOpsTools(server, opts = {}) {
   server.registerTool(
     'graphql_exec',
     {
-      description: 'Execute a GraphQL query against a Siteglide environment via Siteglide-API.',
+      description:
+        'Execute a GraphQL query/mutation against a Siteglide environment via Siteglide-API. ' +
+        'Call envs_list({ details: true }) first. Mutations on classification "production" require human MCP elicitation. ' +
+        'Results are wrapped as untrusted external data.',
+      annotations: { openWorldHint: true },
       inputSchema: {
         environment: z.string().describe('Environment name from .siteglide-config'),
         query: z.string().describe('GraphQL query or mutation string'),
@@ -49,14 +70,32 @@ export function registerOpsTools(server, opts = {}) {
     },
     async (args) => {
       try {
+        assertPayloadSize('GraphQL query', args.query);
         const auth = resolveAuth(args.environment, configPath);
-        log(`graphql_exec: ${args.environment}`);
+        const classification = classifyEnvironment(auth);
+        const host = hostnameFromUrl(auth.url);
+        const mutation = isGraphQLMutation(args.query);
+
+        if (mutation && classification === 'production') {
+          const preview = truncatePreview(args.query);
+          const confirm = await elicitProductionMutationConfirm(server, {
+            env: args.environment,
+            host,
+            preview,
+            log
+          });
+          if (!confirm.ok) {
+            return toolError(new Error(confirm.reason || 'Production mutation not approved.'));
+          }
+        }
+
+        log(`graphql_exec: ${args.environment} (${classification}${mutation ? ', mutation' : ''})`);
         const body = await siteglideApi(auth, {
           method: 'POST',
           path: '/cli/graph',
           json: { query: args.query, variables: args.variables || {} }
         });
-        return toolResult(body);
+        return toolResult(wrapUntrustedResult(body));
       } catch (error) {
         return toolError(error);
       }
@@ -66,7 +105,11 @@ export function registerOpsTools(server, opts = {}) {
   server.registerTool(
     'liquid_exec',
     {
-      description: 'Evaluate Liquid against a Siteglide environment via Siteglide-API.',
+      description:
+        'Evaluate Liquid against a Siteglide environment via Siteglide-API. ' +
+        'Disabled when classification is "production" — write Liquid to project files and sync/deploy; use a staging env to evaluate. ' +
+        'Call envs_list({ details: true }) first. Results are wrapped as untrusted external data.',
+      annotations: { openWorldHint: true },
       inputSchema: {
         environment: z.string().describe('Environment name from .siteglide-config'),
         content: z.string().describe('Liquid source to evaluate')
@@ -74,14 +117,28 @@ export function registerOpsTools(server, opts = {}) {
     },
     async (args) => {
       try {
+        assertPayloadSize('Liquid content', args.content);
         const auth = resolveAuth(args.environment, configPath);
-        log(`liquid_exec: ${args.environment}`);
+        const classification = classifyEnvironment(auth);
+        const host = hostnameFromUrl(auth.url);
+
+        if (classification === 'production') {
+          return toolError(
+            new Error(
+              `liquid_exec is disabled when classification is production ` +
+                `(env "${args.environment}", host: ${host}). ` +
+                `Write Liquid to a project file and sync/deploy when ready; use a staging env to evaluate.`
+            )
+          );
+        }
+
+        log(`liquid_exec: ${args.environment} (${classification})`);
         const body = await siteglideApi(auth, {
           method: 'POST',
           path: '/cli/liquid',
           json: { content: args.content }
         });
-        return toolResult(body);
+        return toolResult(wrapUntrustedResult(body));
       } catch (error) {
         return toolError(error);
       }
@@ -91,7 +148,10 @@ export function registerOpsTools(server, opts = {}) {
   server.registerTool(
     'logs_fetch',
     {
-      description: 'Fetch recent debugging logs for a Siteglide environment.',
+      description:
+        'Fetch recent debugging logs for a Siteglide environment. ' +
+        'Call envs_list({ details: true }) first. Results are wrapped as untrusted external data.',
+      annotations: { openWorldHint: true },
       inputSchema: {
         environment: z.string().describe('Environment name from .siteglide-config'),
         last_id: z.number().optional().describe('Fetch logs after this id (default 0)')
@@ -100,13 +160,14 @@ export function registerOpsTools(server, opts = {}) {
     async (args) => {
       try {
         const auth = resolveAuth(args.environment, configPath);
-        log(`logs_fetch: ${args.environment}`);
+        const classification = classifyEnvironment(auth);
+        log(`logs_fetch: ${args.environment} (${classification})`);
         const body = await siteglideApi(auth, {
           method: 'GET',
           path: '/cli/logs',
           query: { last_id: args.last_id ?? 0 }
         });
-        return toolResult(body);
+        return toolResult(wrapUntrustedResult(body));
       } catch (error) {
         return toolError(error);
       }

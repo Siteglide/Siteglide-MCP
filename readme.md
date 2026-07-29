@@ -4,15 +4,19 @@ Experimental **Siteglide MCP server** for desktop AI agents (Cursor, Claude Code
 
 ## Capabilities (stdio / desktop)
 
-| Tool | Purpose | Auth |
+| Tool | Purpose | Auth / gates |
 | --- | --- | --- |
 | `validate_code` | Lint Liquid/GraphQL/YAML before write (platformOS check engine) | None (local FS) |
 | `siteglide_rules` | Load Siteglide agent rules | None |
 | `siteglide_guide` | Load short Siteglide convention guide | None |
-| `envs_list` | List environments from `.siteglide-config` | Config file |
-| `graphql_exec` | Run GraphQL via Siteglide-API | Siteglide auth |
-| `liquid_exec` | Evaluate Liquid via Siteglide-API | Siteglide auth |
-| `logs_fetch` | Fetch recent site logs | Siteglide auth |
+| `envs_list` | List envs with host; `details: true` adds `url` + `classification` (`staging`\|`production`) | Config (MCP only — never tokens/emails) |
+| `graphql_exec` | Run GraphQL via Siteglide-API | Auth via MCP; **production mutations** need human elicitation; results wrapped as untrusted |
+| `liquid_exec` | Evaluate Liquid via Siteglide-API | Auth via MCP; **blocked on production**; staging OK; results wrapped as untrusted |
+| `logs_fetch` | Fetch recent site logs | Auth via MCP; results wrapped as untrusted |
+
+**Secrets:** Agents must **never** read `.siteglide-config`. Always call `envs_list({ details: true })` before env-scoped ops. Ops tools load tokens internally.
+
+**Classification:** MCP classifies from the site URL hostname (not the env key name). Staging hosts match `.staging-siteglide.com` / `.staging.oregon.platform-os.com`; everything else (including custom domains) is `production`.
 
 **Project layout:** use `app/` (platformOS modern root). `siteglide-cli pull` migrates `marketplace_builder/` → `app/` when needed (`git mv` in a git repo, otherwise rename).
 
