@@ -75,7 +75,7 @@ Human workflows (CLI GUI Liquid/GraphQL evaluators, Admin UI) remain available. 
 
 - Installed/registered via Siteglide CLI (`pull` wires IDE MCP config; `siteglide-cli mcp` launches the server).
 - Experimental package; preview builds can be shared as `siteglide-cli-test` so they don’t replace production CLI.
-- Prefer modern `app/` layout (pull can migrate legacy `marketplace_builder/` with confirmation).
+- Keep the project's existing site root (`app/` or legacy `marketplace_builder/`). Pull does **not** rename between them. Agents treat `marketplace_builder/` as equivalent to `app/` when platformOS tools only name `app/`.
 
 ---
 

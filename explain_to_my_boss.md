@@ -44,7 +44,9 @@ Many Siteglide sites historically used **`marketplace_builder/`** instead of mod
 
 platformOS’s tooling expects **`app/`**. Their advice: rename the folder.
 
-**What we do:** on **`siteglide-cli pull`**, if `marketplace_builder/` exists and `app/` does not, we migrate it — `git mv marketplace_builder app` when the project is a git repo, otherwise a normal rename. Pull then writes into `app/`. No temporary MCP path bridge.
+**What we do:** on **`siteglide-cli pull`**, we write into the project's existing site root (`app/` if present, otherwise `marketplace_builder/`). We do **not** rename between those folders.
+
+**For agents:** `marketplace_builder/` is the legacy name for the same site root. When platformOS node modules / docs only talk about `app/`, apply the same paths under `marketplace_builder/` if that is what is on disk.
 
 ## Auth (who needs what)
 
@@ -61,7 +63,7 @@ No conflict with platformOS auth: their validator doesn’t use our login; our o
 - Local/IDE use over stdio (how Cursor/Claude talk to MCP today)  
 - Ops tools like GraphQL, Liquid, logs, list environments (via MCP)  
 - Siteglide rules/guides for agents (alongside existing skills)  
-- Pull migrates `marketplace_builder/` → `app/` (platformOS layout)  
+- Pull keeps existing `marketplace_builder/` or `app/` (no rename); agents treat them as equivalent site roots  
 - CLI `mcp` launcher; MCP registration on `pull` (Cursor, Claude, Copilot, Windsurf)  
 
 **Later**  

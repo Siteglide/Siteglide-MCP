@@ -9,8 +9,8 @@ const DEFAULT_VERSION = '0.1.0';
 /**
  * Build the composed MCP server (tools registered; transport not connected).
  * Uses platformOS check-node for validate_code (same engine as platformos-mcp-supervisor)
- * plus Siteglide rules and ops tools. Projects should use `app/` (pull migrates
- * marketplace_builder → app).
+ * plus Siteglide rules and ops tools. Site root may be `app/` or legacy
+ * `marketplace_builder/` (equivalent; pull does not rename).
  *
  * @param {object} opts
  * @param {string} opts.projectDir

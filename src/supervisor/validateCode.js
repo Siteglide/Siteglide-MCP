@@ -64,7 +64,7 @@ export function registerValidateCode(server, ctx) {
       description:
         'Validate a Siteglide / platformOS Liquid, GraphQL, or YAML file before writing it. ' +
         'Returns structured errors, warnings, and a must_fix_before_write gate. ' +
-        'Expects a modern app/ project layout (siteglide-cli pull migrates marketplace_builder → app).',
+        'Expects app/ or legacy marketplace_builder/ as the site root (same role; pull does not rename between them).',
       inputSchema: VALIDATE_CODE_INPUT
     },
     async (args) => {

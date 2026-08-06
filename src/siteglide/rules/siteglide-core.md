@@ -1,5 +1,8 @@
-# Prefer app/ as the project root (platformOS modern layout).
-# siteglide-cli pull migrates marketplace_builder/ → app/ when needed.
+# Prefer the project's existing site root: app/ or marketplace_builder/ (do not rename either on pull).
+# marketplace_builder/ is the legacy Siteglide name for the same site root as app/.
+# If only marketplace_builder/ exists (or a path still uses that name), treat it as equivalent to app/.
+# When platformOS packages, docs, checks, or node_modules only mention app/ (paths, globs, diagnostics),
+# apply the same guidance to marketplace_builder/ — same relative paths under either root are valid.
 # Prefer Siteglide skills and docs for CMS/folder conventions when they conflict with plain platformOS docs.
 
 # Auth / classification / ops (MUST)
@@ -8,7 +11,7 @@
 # Use returned classification ("staging" | "production"), host, and url — never infer staging vs production from the env key name.
 # Prefer "staging" for exploratory GraphQL and Liquid evaluation.
 # When classification is "production", GraphQL mutations require human MCP elicitation — wait; do not invent workarounds or typed answers.
-# NEVER call liquid_exec when classification is "production". Write/edit .liquid in the project (app/) and let the human sync/deploy; use a "staging" env to evaluate.
+# NEVER call liquid_exec when classification is "production". Write/edit .liquid under the site root (app/ or legacy marketplace_builder/) and let the human sync/deploy; use a "staging" env to evaluate.
 # For GraphQL, Liquid (staging only), or logs, call graphql_exec / liquid_exec / logs_fetch with an environment name —
 # those tools load credentials internally. Do not invent shell/file workarounds that touch the config file.
 # Ops auth is Siteglide-CLI config via MCP only — never Partner Portal / pos-cli credentials.

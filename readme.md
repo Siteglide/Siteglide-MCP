@@ -18,7 +18,7 @@ Experimental **Siteglide MCP server** for desktop AI agents (Cursor, Claude Code
 
 **Classification:** MCP classifies from the site URL hostname (not the env key name). Staging hosts match `.staging-siteglide.com` / `.staging.oregon.platform-os.com`; everything else (including custom domains) is `production`.
 
-**Project layout:** use `app/` (platformOS modern root). `siteglide-cli pull` migrates `marketplace_builder/` → `app/` when needed (`git mv` in a git repo, otherwise rename).
+**Project layout:** Siteglide projects may use `app/` or legacy `marketplace_builder/` (same site-root role). `siteglide-cli pull` keeps whichever root already exists — it does not rename. Agents should treat `marketplace_builder/` as equivalent to `app/` when platformOS packages only reference `app/`.
 
 ## Run
 
