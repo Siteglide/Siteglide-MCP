@@ -39,11 +39,12 @@ Skills (guidance docs) and MCP (callable actions) are complementary: skills teac
 | `siteglide_rules` | Load Siteglide MUST/prefer rules (layout, secrets, CLI auth, prod sync safety) | None | Early in a Siteglide task; whenever the agent needs project rules |
 | `siteglide_guide` | Short Siteglide vs platformOS convention notes | None | When terminology or folder structure conflicts with generic pOS docs |
 | `envs_list` | List envs; with `details: true` returns `classification` (`staging`\|`production`), host, url | Config **inside MCP only** (no tokens) | Before any env-scoped ops — **never** by opening `.siteglide-config` |
+| `sync_status` | Lists live CLI sync/watch processes for the project; `treatAsProduction` if any production (or unknown) sync is active | Local `.siteglide/sync/<pid>.json` files + pid liveness | **Before editing files** — production-sync safety gate (also when staging+production sync together) |
 | `graphql_exec` | Run a GraphQL query/mutation via Siteglide-API | Token via MCP; **production mutations** need human elicitation; results marked untrusted | Prefer staging; inspect/update records with human confirm on prod writes |
 | `liquid_exec` | Evaluate Liquid via Siteglide-API | Token via MCP; **blocked on production** | Staging only — write files + sync for prod |
 | `logs_fetch` | Fetch recent debugging logs for an env | Token via MCP; results marked untrusted | Diagnose runtime errors after a change |
 
-Human workflows (CLI GUI Liquid/GraphQL evaluators, Admin UI) remain available. MCP is for **agent** use of the same backend capabilities.
+Human workflows (CLI GUI Liquid/GraphQL evaluators, Admin UI) remain available. MCP is for **agent** use of the same backend capabilities. The CLI refuses a second `sync` for the same environment in the same directory; different envs may run at once, and `treatAsProduction` stays true until no production sync remains.
 
 ---
 

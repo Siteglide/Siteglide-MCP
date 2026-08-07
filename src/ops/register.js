@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { join } from 'node:path';
 import { listEnvironments, resolveAuth, siteglideApi } from './client.js';
 import {
   classifyEnvironment,
@@ -9,6 +10,7 @@ import {
   assertPayloadSize
 } from './security.js';
 import { elicitProductionMutationConfirm } from './elicitConfirm.js';
+import { getSyncStatus } from './syncStatus.js';
 
 function toolResult(data) {
   return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
@@ -24,10 +26,11 @@ function toolError(error) {
 
 /**
  * @param {import('@modelcontextprotocol/sdk/server/mcp.js').McpServer} server
- * @param {{ configPath?: string, log?: (m: string) => void }} [opts]
+ * @param {{ configPath?: string, projectDir?: string, log?: (m: string) => void }} [opts]
  */
 export function registerOpsTools(server, opts = {}) {
   const configPath = opts.configPath || process.env.CONFIG_FILE_PATH || '.siteglide-config';
+  const projectDir = opts.projectDir || process.cwd();
   const log = opts.log ?? (() => {});
 
   server.registerTool(
@@ -48,6 +51,36 @@ export function registerOpsTools(server, opts = {}) {
       try {
         const details = Boolean(args?.details);
         return toolResult({ environments: listEnvironments(configPath, { details }) });
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'sync_status',
+    {
+      description:
+        'Report whether siteglide-cli sync/watch is active for this MCP project directory. ' +
+        'Aggregates all live syncs (different envs may run together). ' +
+        'Use treatAsProduction: if true, follow production sync safety elicitation before editing. ' +
+        'Clears stale status files whose process pid is no longer alive. ' +
+        'Do not infer sync from IDE terminal metadata.',
+      inputSchema: {}
+    },
+    async () => {
+      try {
+        const status = getSyncStatus({
+          projectDir,
+          configPath:
+            !opts.configPath && !process.env.CONFIG_FILE_PATH
+              ? join(projectDir, '.siteglide-config')
+              : configPath
+        });
+        log(
+          `sync_status: active=${status.active} treatAsProduction=${status.treatAsProduction} syncs=${status.syncs.length}`
+        );
+        return toolResult(status);
       } catch (error) {
         return toolError(error);
       }

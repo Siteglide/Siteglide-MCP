@@ -29,7 +29,7 @@ export async function composeServer(opts) {
 
   registerValidateCode(server, { projectDir, log });
   registerSiteglideTools(server);
-  registerOpsTools(server, { configPath: opts.configPath, log });
+  registerOpsTools(server, { configPath: opts.configPath, projectDir, log });
 
   let closed = false;
   const shutdown = async (reason) => {
