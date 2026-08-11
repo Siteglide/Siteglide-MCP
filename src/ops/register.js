@@ -11,6 +11,8 @@ import {
 } from './security.js';
 import { elicitProductionMutationConfirm } from './elicitConfirm.js';
 import { getSyncStatus } from './syncStatus.js';
+import { getRemoteCheckStatus } from './remoteCheckStatus.js';
+import { getGitStatus } from './gitStatus.js';
 
 function toolResult(data) {
   return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
@@ -51,6 +53,54 @@ export function registerOpsTools(server, opts = {}) {
       try {
         const details = Boolean(args?.details);
         return toolResult({ environments: listEnvironments(configPath, { details }) });
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'remote_check_status',
+    {
+      description:
+        'Read Siteglide CLI remote-mtime / merge-first / stash-pop conflict logs under .siteglide/ for this project. ' +
+        'Prefer this over IDE terminal scrollback when sync or deploy warns about remote conflicts. ' +
+        'recommendedActions[].id values are stable for agent branching (e.g. merge_first, resolve_conflicts).',
+      inputSchema: {
+        environment: z
+          .string()
+          .optional()
+          .describe('Optional environment name; omit to list all conflict logs')
+      }
+    },
+    async (args) => {
+      try {
+        const status = getRemoteCheckStatus({
+          projectDir,
+          environment: args?.environment
+        });
+        log(`remote_check_status: activeConflict=${status.activeConflict}`);
+        return toolResult(status);
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'git_status',
+    {
+      description:
+        'Probe git install, user.name/user.email, repo init, remotes, and optional gh auth for this project. ' +
+        'If needsSetupWizard is true, elicit whether the user wants guided setup (install git, identity, git init; remote optional). ' +
+        'Specialize in setup and conflict recovery; CLI owns routine pull/deploy git prompts.',
+      inputSchema: {}
+    },
+    async () => {
+      try {
+        const status = getGitStatus({ projectDir });
+        log(`git_status: needsSetupWizard=${status.needsSetupWizard} missing=${status.missing.join(',')}`);
+        return toolResult(status);
       } catch (error) {
         return toolError(error);
       }
