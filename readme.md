@@ -1,4 +1,4 @@
-# Siteglide MCP (Experimental)
+# Siteglide MCP
 
 Experimental **Siteglide MCP server** for desktop AI agents (Cursor, Claude Code, VS Code, Windsurf). HTTP/Docker for browser agents is deferred.
 
@@ -26,7 +26,7 @@ Experimental **Siteglide MCP server** for desktop AI agents (Cursor, Claude Code
 ## Run
 
 ```bash
-cd Siteglide-MCP---Experimental
+cd Siteglide-MCP
 npm install
 node bin/siteglide-mcp.js --project /path/to/site
 

@@ -1,6 +1,6 @@
 {
   "name": "@siteglide/siteglide-mcp",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.0",
   "description": "Siteglide MCP server — compose platformOS validate_code with Siteglide rules and ops tools",
   "type": "module",
   "main": "src/index.js",
@@ -16,19 +16,36 @@
   },
   "scripts": {
     "start": "node bin/siteglide-mcp.js",
-    "test": "node --test test/**/*.test.js"
+    "test": "node --test test/**/*.test.js",
+    "prepublishOnly": "npm test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@platformos/platformos-check-node": "^0.0.20",
     "@platformos/platformos-mcp-supervisor": "^0.0.2",
-    "@siteglide/siteglide-cli": "file:../siteglide-cli",
     "zod": "^3.23.8"
   },
+  "publishConfig": {
+    "access": "restricted",
+    "tag": "alpha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/siteglide/Siteglide-MCP.git"
+  },
+  "bugs": {
+    "url": "https://feedback.siteglide.com"
+  },
+  "homepage": "https://siteglide.com",
+  "keywords": [
+    "siteglide",
+    "mcp",
+    "model-context-protocol",
+    "platformos"
+  ],
   "license": "MIT",
   "files": [
     "bin",
-    "src",
-    "test"
+    "src"
   ]
 }

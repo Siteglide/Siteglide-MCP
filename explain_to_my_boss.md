@@ -11,7 +11,7 @@ We’re extending Siteglide’s CLI and AI tooling so agents (Cursor, Claude, an
 **1. Siteglide MCP server (new experimental repo)**  
 An MCP server is how AI tools get a standard set of “capabilities” (validate code, run queries, fetch logs, load Siteglide rules, etc.).
 
-We’re putting that in **`Siteglide-MCP---Experimental`**, not inside the CLI, so we can:
+We’re putting that in **`Siteglide-MCP`**, not inside the CLI, so we can:
 - version and ship it separately  
 - later run it in **Docker / on the web** for browser-based AI agents  
 - keep Siteglide-specific tooling in one place  
