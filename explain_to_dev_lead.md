@@ -40,6 +40,9 @@ Skills (guidance docs) and MCP (callable actions) are complementary: skills teac
 | `siteglide_guide` | Short Siteglide vs platformOS convention notes | None | When terminology or folder structure conflicts with generic pOS docs |
 | `envs_list` | List envs; with `details: true` returns `classification` (`staging`\|`production`), host, url | Config **inside MCP only** (no tokens) | Before any env-scoped ops — **never** by opening `.siteglide-config` |
 | `sync_status` | Lists live CLI sync/watch processes for the project; `treatAsProduction` if any production (or unknown) sync is active | Local `.siteglide/sync/<pid>.json` files + pid liveness | **Before editing files** — production-sync safety gate (also when staging+production sync together) |
+| `git_status` | Probe git install/identity/repo; optional setup wizard; ensures `.siteglide/` is gitignored | Local git | Early in a session; git setup / conflict recovery |
+| `audience` | Read/fill project role + git/CLI experience; returns language guidance | Local `.siteglide/project-preferences.json` | Early in a session; before explaining git or CLI commands |
+| `remote_check_status` | Read CLI remote-mtime / merge / stash logs + live sync `current-conflict.json`; path/changedAt freshness for agent edits while sync is on | Local `.siteglide/` logs | After editing while sync is active, or when sync/deploy warns about remote conflicts |
 | `graphql_exec` | Run a GraphQL query/mutation via Siteglide-API | Token via MCP; **production mutations** need human elicitation; results marked untrusted | Prefer staging; inspect/update records with human confirm on prod writes |
 | `liquid_exec` | Evaluate Liquid via Siteglide-API | Token via MCP; **blocked on production** | Staging only — write files + sync for prod |
 | `logs_fetch` | Fetch recent debugging logs for an env | Token via MCP; results marked untrusted | Diagnose runtime errors after a change |
