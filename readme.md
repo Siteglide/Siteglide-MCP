@@ -10,14 +10,13 @@ Experimental **Siteglide MCP server** for desktop AI agents (Cursor, Claude Code
 | `siteglide_rules` | Load Siteglide agent rules | None |
 | `siteglide_guide` | Load short Siteglide convention guide | None |
 | `envs_list` | List envs with host; `details: true` adds `url` + `classification` (`staging`\|`production`) | Config (MCP only — never tokens/emails) |
-| `sync_status` | Report live `siteglide-cli sync` watches for this project; `treatAsProduction` if any prod/unknown sync is live | Local status files under `.siteglide/sync/` (pid-checked) |
 | `graphql_exec` | Run GraphQL via Siteglide-API | Auth via MCP; **production mutations** need human elicitation; results wrapped as untrusted |
 | `liquid_exec` | Evaluate Liquid via Siteglide-API | Auth via MCP; **blocked on production**; staging OK; results wrapped as untrusted |
 | `logs_fetch` | Fetch recent site logs | Auth via MCP; results wrapped as untrusted |
 
 **Secrets:** Agents must **never** read `.siteglide-config`. Always call `envs_list({ details: true })` before env-scoped ops. Ops tools load tokens internally.
 
-**Sync safety:** Before editing project files, agents must call `sync_status`. If `treatAsProduction` is true (any live sync is production, or staging+production together), follow the production sync elicit in `siteglide_rules`. Do not infer sync from IDE terminals. The CLI refuses a second sync for the same environment in the same directory; different envs may run together.
+**Sync safety:** There is no MCP sync/conflict-status tool yet — published `siteglide-cli` does not write `.siteglide/sync` (or remote-check/merge/git) status files. Agents must ask the user (or read the CLI terminal) whether sync is running before editing production. The CLI refuses a second sync for the same environment in the same directory; different envs may run together.
 
 **Classification:** MCP classifies from the site URL hostname (not the env key name). Staging hosts match `.staging-siteglide.com` / `.staging.oregon.platform-os.com`; everything else (including custom domains) is `production`.
 
