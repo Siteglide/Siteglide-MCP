@@ -1,6 +1,6 @@
 {
   "name": "@siteglide/siteglide-mcp",
-  "version": "0.1.0-alpha.0",
+  "version": "0.1.0-alpha.1",
   "description": "Siteglide MCP server — compose platformOS validate_code with Siteglide rules and ops tools",
   "type": "module",
   "main": "src/index.js",
