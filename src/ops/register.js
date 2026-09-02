@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { join } from 'node:path';
 import { listEnvironments, resolveAuth, siteglideApi } from './client.js';
 import {
   classifyEnvironment,
@@ -10,9 +9,10 @@ import {
   assertPayloadSize
 } from './security.js';
 import { elicitProductionMutationConfirm } from './elicitConfirm.js';
-import { getSyncStatus } from './syncStatus.js';
-import { getRemoteCheckStatus } from './remoteCheckStatus.js';
 import { getGitStatus } from './gitStatus.js';
+// import { join } from 'node:path';
+// import { getSyncStatus } from './syncStatus.js';
+// import { getRemoteCheckStatus } from './remoteCheckStatus.js';
 
 function toolResult(data) {
   return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
@@ -59,33 +59,34 @@ export function registerOpsTools(server, opts = {}) {
     }
   );
 
-  server.registerTool(
-    'remote_check_status',
-    {
-      description:
-        'Read Siteglide CLI remote-mtime / merge-first / stash-pop conflict logs under .siteglide/ for this project. ' +
-        'Prefer this over IDE terminal scrollback when sync or deploy warns about remote conflicts. ' +
-        'recommendedActions[].id values are stable for agent branching (e.g. merge_first, resolve_conflicts).',
-      inputSchema: {
-        environment: z
-          .string()
-          .optional()
-          .describe('Optional environment name; omit to list all conflict logs')
-      }
-    },
-    async (args) => {
-      try {
-        const status = getRemoteCheckStatus({
-          projectDir,
-          environment: args?.environment
-        });
-        log(`remote_check_status: activeConflict=${status.activeConflict}`);
-        return toolResult(status);
-      } catch (error) {
-        return toolError(error);
-      }
-    }
-  );
+  // Uncomment when siteglide-cli writes .siteglide/sync, remote-check, merge, and git status files.
+  // server.registerTool(
+  //   'remote_check_status',
+  //   {
+  //     description:
+  //       'Read Siteglide CLI remote-mtime / merge-first / stash-pop conflict logs under .siteglide/ for this project. ' +
+  //       'Prefer this over IDE terminal scrollback when sync or deploy warns about remote conflicts. ' +
+  //       'recommendedActions[].id values are stable for agent branching (e.g. merge_first, resolve_conflicts).',
+  //     inputSchema: {
+  //       environment: z
+  //         .string()
+  //         .optional()
+  //         .describe('Optional environment name; omit to list all conflict logs')
+  //     }
+  //   },
+  //   async (args) => {
+  //     try {
+  //       const status = getRemoteCheckStatus({
+  //         projectDir,
+  //         environment: args?.environment
+  //       });
+  //       log(`remote_check_status: activeConflict=${status.activeConflict}`);
+  //       return toolResult(status);
+  //     } catch (error) {
+  //       return toolError(error);
+  //     }
+  //   }
+  // );
 
   server.registerTool(
     'git_status',
@@ -107,35 +108,36 @@ export function registerOpsTools(server, opts = {}) {
     }
   );
 
-  server.registerTool(
-    'sync_status',
-    {
-      description:
-        'Report whether siteglide-cli sync/watch is active for this MCP project directory. ' +
-        'Aggregates all live syncs (different envs may run together). ' +
-        'Use treatAsProduction: if true, follow production sync safety elicitation before editing. ' +
-        'Clears stale status files whose process pid is no longer alive. ' +
-        'Do not infer sync from IDE terminal metadata.',
-      inputSchema: {}
-    },
-    async () => {
-      try {
-        const status = getSyncStatus({
-          projectDir,
-          configPath:
-            !opts.configPath && !process.env.CONFIG_FILE_PATH
-              ? join(projectDir, '.siteglide-config')
-              : configPath
-        });
-        log(
-          `sync_status: active=${status.active} treatAsProduction=${status.treatAsProduction} syncs=${status.syncs.length}`
-        );
-        return toolResult(status);
-      } catch (error) {
-        return toolError(error);
-      }
-    }
-  );
+  // Uncomment with remote_check_status when CLI writes .siteglide/sync/<pid>.json.
+  // server.registerTool(
+  //   'sync_status',
+  //   {
+  //     description:
+  //       'Report whether siteglide-cli sync/watch is active for this MCP project directory. ' +
+  //       'Aggregates all live syncs (different envs may run together). ' +
+  //       'Use treatAsProduction: if true, follow production sync safety elicitation before editing. ' +
+  //       'Clears stale status files whose process pid is no longer alive. ' +
+  //       'Do not infer sync from IDE terminal metadata.',
+  //     inputSchema: {}
+  //   },
+  //   async () => {
+  //     try {
+  //       const status = getSyncStatus({
+  //         projectDir,
+  //         configPath:
+  //           !opts.configPath && !process.env.CONFIG_FILE_PATH
+  //             ? join(projectDir, '.siteglide-config')
+  //             : configPath
+  //       });
+  //       log(
+  //         `sync_status: active=${status.active} treatAsProduction=${status.treatAsProduction} syncs=${status.syncs.length}`
+  //       );
+  //       return toolResult(status);
+  //     } catch (error) {
+  //       return toolError(error);
+  //     }
+  //   }
+  // );
 
   server.registerTool(
     'graphql_exec',

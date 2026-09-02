@@ -69,6 +69,6 @@ export function getGitStatus(opts) {
       ? 'Offer the user a guided git setup via MCP elicitation (install git, set user.name/email, git init). Remote/GitHub is optional.'
       : remotes.length === 0
         ? 'Git is ready locally. Offering a GitHub remote remains optional.'
-        : 'Git is ready. Prefer remote_check_status when sync/deploy conflicts are mentioned.'
+        : 'Git is ready. For sync/deploy conflicts, ask the user or read the CLI terminal.'
   };
 }
