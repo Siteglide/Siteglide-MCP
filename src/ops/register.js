@@ -144,20 +144,30 @@ export function registerOpsTools(server, opts = {}) {
     {
       description:
         'List module machine names installed on a Siteglide site. ' +
-        'Uses the same GET /cli/list_modules call as siteglide-cli pull and siteglide-cli modules. ' +
+        'Reads `.siteglide/project/modules.json` `installed.<env>` when fresh (last_checked within 2 hours); ' +
+        'otherwise GET /cli/list_modules (same as siteglide-cli pull/modules) and writes the cache. ' +
+        'Reuse cached results within a session — call refresh: true only after the user installs or removes a module. ' +
         'Call envs_list({ details: true }) first.',
       annotations: { openWorldHint: true },
       inputSchema: {
-        environment: z.string().describe('Environment name from .siteglide-config')
+        environment: z.string().describe('Environment name from .siteglide-config'),
+        refresh: z
+          .boolean()
+          .optional()
+          .describe(
+            'When true, bypass the 2-hour cache and fetch live from the site, then update `.siteglide/project/modules.json`.'
+          )
       }
     },
     async (args) => {
       try {
         const result = await listInstalledModules({
           environment: args.environment,
-          configPath
+          configPath,
+          projectDir,
+          refresh: Boolean(args?.refresh)
         });
-        log(`modules_list: ${args.environment} count=${result.count}`);
+        log(`modules_list: ${args.environment} count=${result.count} cached=${result.cached}`);
         return toolResult(result);
       } catch (error) {
         return toolError(error);

@@ -25,7 +25,7 @@ Liquid references do not include `public/` or `private/` in the path (e.g. `modu
 ## Agent workflow when you see MissingPartial under `modules/`
 
 1. Note the **module name** from the path (`modules/<name>/...`).
-2. Call **`modules_list`** — is `<name>` installed on the site?
+2. Call **`modules_list` once per environment per session** (cached 2 hours in `.siteglide/project/modules.json` under `installed.<env>`) — is `<name>` installed on the site? Reuse the result; use `refresh: true` only if the user just installed or removed a module.
 3. Check disk — does `./modules/<name>/` exist in the project?
 4. Classify:
 
