@@ -15,7 +15,7 @@ export function registerHealthTools(server, opts) {
   const log = opts.log ?? (() => {});
 
   server.registerTool(
-    'server_health',
+    'mcp_server_status',
     {
       description:
         'Instant Siteglide MCP connectivity check (no git, network, or config reads). ' +
@@ -26,7 +26,7 @@ export function registerHealthTools(server, opts) {
     },
     async () => {
       const health = getServerHealth(serverMeta);
-      log(`server_health: ok uptimeMs=${health.uptimeMs} pid=${health.pid}`);
+      log(`mcp_server_status: ok uptimeMs=${health.uptimeMs} pid=${health.pid}`);
       return toolResult(health);
     }
   );

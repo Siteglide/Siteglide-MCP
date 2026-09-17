@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import { getGitStatus } from './gitStatus.js';
 import { getSyncStatus } from './syncStatus.js';
 import { listInstalledModules } from './installedModules.js';
+import { getTargetAudience } from './targetAudience.js';
 // import { getRemoteCheckStatus } from './remoteCheckStatus.js';
 
 function toolResult(data) {
@@ -102,6 +103,42 @@ export function registerOpsTools(server, opts = {}) {
       try {
         const status = getGitStatus({ projectDir });
         log(`git_status: needsSetupWizard=${status.needsSetupWizard} missing=${status.missing.join(',')}`);
+        return toolResult(status);
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'audience',
+    {
+      description:
+        'Read or fill `.siteglide/project/project-preferences.json` target_audience (role, git, Siteglide CLI). ' +
+        'Call early in a Siteglide session. If any value is null, prompt the user with the allowed options, then write the file. ' +
+        'When complete, follow languageGuidance: define git terms for git beginners; explain sync/deploy/pull for Siteglide CLI beginners; ' +
+        'pass role through and interpret it yourself. Pass answers here if the user already chose in chat (use siteglideCli for CLI experience).',
+      inputSchema: {
+        role: z
+          .string()
+          .optional()
+          .describe('designer | business leader | developer | tester | marketing | seo | support | other'),
+        git: z.string().optional().describe('beginner | advanced'),
+        siteglideCli: z.string().optional().describe('Siteglide CLI experience: beginner | advanced')
+      }
+    },
+    async (args) => {
+      try {
+        const status = await getTargetAudience({
+          projectDir,
+          server,
+          answers: {
+            role: args?.role,
+            git: args?.git,
+            siteglideCli: args?.siteglideCli
+          }
+        });
+        log(`audience: complete=${status.complete} missing=${(status.missing || []).join(',')}`);
         return toolResult(status);
       } catch (error) {
         return toolError(error);

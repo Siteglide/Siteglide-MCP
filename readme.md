@@ -11,6 +11,7 @@ Experimental **Siteglide MCP server** for desktop AI agents (Cursor, Claude Code
 | `siteglide_guide` | Load short Siteglide convention guide | None |
 | `envs_list` | List envs with host; `details: true` adds `url` + `classification` (`staging`\|`production`) | Config (MCP only — never tokens/emails) |
 | `modules_list` | Installed module names; caches in `.siteglide/project/modules.json` (`installed.<env>`, 2h TTL). `refresh: true` to bust cache | Auth via MCP |
+| `audience` | Read/fill `.siteglide/project/project-preferences.json` (role, git, CLI experience); languageGuidance for agents | None (local FS); optional MCP form elicitation |
 | `graphql_exec` | Run GraphQL via Siteglide-API | Auth via MCP; **production mutations** need human elicitation; results wrapped as untrusted |
 | `liquid_exec` | Evaluate Liquid via Siteglide-API | Auth via MCP; **blocked on production**; staging OK; results wrapped as untrusted |
 | `logs_fetch` | Fetch recent site logs | Auth via MCP; results wrapped as untrusted |
