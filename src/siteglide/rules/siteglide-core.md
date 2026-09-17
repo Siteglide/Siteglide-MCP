@@ -17,7 +17,9 @@
 # Ops auth is Siteglide-CLI config via MCP only — never Partner Portal / pos-cli credentials.
 # Prefer Siteglide MCP tools (validate_code, siteglide_rules, siteglide_guide, server_health, envs_list, modules_list, sync_status, git_status, ops) for Siteglide work.
 # modules_list returns installed module machine names from the live site (same API as pull); use before pull/module work when the installed set is unknown.
-# validate_code: call BEFORE writing Liquid, GraphQL, or YAML. Pass one file as { file_path, content } OR send coordinated multi-file edits as { files: [{ file_path, content }, ...] } so partials and callers resolve together. Respect must_fix_before_write — do not write when true.
+# validate_code: call BEFORE writing Liquid, GraphQL, or YAML. Pass one file as { file_path, content } OR send coordinated multi-file edits as { files: [{ file_path, content }, ...] } so partials and callers resolve together. Respect must_fix_before_write — do not write when true, EXCEPT expected module visibility gaps (see below).
+# MissingPartial on modules/<name>/...: call siteglide_guide({ name: 'local-validation-gaps' }) when this appears — especially the same error on many Studio pages. Always call modules_list first. If <name> is NOT installed: ask the user to verify and whether they want to install the module (or fix/remove the reference) — do not proceed as if it were a local-only gap. If installed but absent on disk: may be pull skip or private/ code (never downloads) — do not "fix" every page; NEVER use pull -m to fix local lint of private module code (pull is public/ only).
+# If only blocking findings are expected module gaps (installed on modules_list, not a missing-module case) on caller files you are not authoring inside that module, proceed with your caller edit; still fix real issues (syntax, app/ typos, custom module paths, etc.).
 # envs_list never returns tokens or emails.
 
 # Git readiness + conflict recovery (MUST when relevant)
