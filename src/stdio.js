@@ -1,6 +1,7 @@
 import { statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { clearMcpSessionMarker, writeMcpSessionMarker } from './ops/sessionMarker.js';
 import { composeServer } from './supervisor/compose.js';
 
 /**
@@ -20,21 +21,36 @@ export async function startSiteglideMcp(opts) {
   }
 
   const log = (msg) => console.error(`[siteglide-mcp] ${msg}`);
-  const { server, shutdown } = await composeServer({
+  const bootStarted = Date.now();
+  log(`starting (project: ${projectDir})`);
+
+  const { server, shutdown, context } = await composeServer({
     projectDir,
     configPath: opts.configPath,
     log
   });
+  log(`tools registered in ${Date.now() - bootStarted}ms`);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  log(`listening on stdio (project: ${projectDir})`);
+
+  const markerPath = writeMcpSessionMarker({
+    projectDir,
+    startedAt: context.serverMeta.startedAt,
+    version: context.serverMeta.version
+  });
+  log(`listening on stdio (project: ${projectDir}, pid: ${process.pid}, marker: ${markerPath})`);
+
+  const shutdownWithCleanup = async (reason) => {
+    clearMcpSessionMarker(projectDir);
+    await shutdown(reason);
+  };
 
   for (const signal of ['SIGINT', 'SIGTERM']) {
     process.once(signal, () => {
-      void shutdown(signal).finally(() => process.exit(0));
+      void shutdownWithCleanup(signal).finally(() => process.exit(0));
     });
   }
 
-  return { server, shutdown };
+  return { server, shutdown: shutdownWithCleanup };
 }

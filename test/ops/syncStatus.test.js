@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { getSyncStatus } from '../../src/ops/syncStatus.js';
 
 function writeSyncEntry(projectDir, { pid, environment, startedAt = '2026-08-07T12:00:00.000Z' }) {
-  const dir = join(projectDir, '.siteglide', 'sync');
+  const dir = join(projectDir, '.siteglide', 'user', 'sync');
   mkdirSync(dir, { recursive: true });
   writeFileSync(
     join(dir, `${pid}.json`),
@@ -81,7 +81,7 @@ describe('getSyncStatus', () => {
     assert.equal(status.active, false);
     assert.equal(status.treatAsProduction, false);
     assert.equal(status.staleCleared, 1);
-    assert.equal(existsSync(join(dir, '.siteglide', 'sync', '999001.json')), false);
+    assert.equal(existsSync(join(dir, '.siteglide', 'user', 'sync', '999001.json')), false);
   });
 
   it('reports one live staging sync without treatAsProduction', () => {
@@ -147,6 +147,6 @@ describe('getSyncStatus', () => {
     assert.equal(status.active, true);
     assert.equal(status.treatAsProduction, false);
     assert.equal(status.staleCleared, 1);
-    assert.deepEqual(readdirSync(join(dir, '.siteglide', 'sync')), ['111.json']);
+    assert.deepEqual(readdirSync(join(dir, '.siteglide', 'user', 'sync')), ['111.json']);
   });
 });

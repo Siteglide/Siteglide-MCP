@@ -17,7 +17,8 @@
   "scripts": {
     "start": "node bin/siteglide-mcp.js",
     "test": "node --test test/**/*.test.js",
-    "prepublishOnly": "npm test"
+    "prepublishOnly": "npm test",
+    "i": "npm install -g ."
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

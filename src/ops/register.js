@@ -9,9 +9,9 @@ import {
   assertPayloadSize
 } from './security.js';
 import { elicitProductionMutationConfirm } from './elicitConfirm.js';
+import { join } from 'node:path';
 import { getGitStatus } from './gitStatus.js';
-// import { join } from 'node:path';
-// import { getSyncStatus } from './syncStatus.js';
+import { getSyncStatus } from './syncStatus.js';
 // import { getRemoteCheckStatus } from './remoteCheckStatus.js';
 
 function toolResult(data) {
@@ -108,36 +108,35 @@ export function registerOpsTools(server, opts = {}) {
     }
   );
 
-  // Uncomment with remote_check_status when CLI writes .siteglide/sync/<pid>.json.
-  // server.registerTool(
-  //   'sync_status',
-  //   {
-  //     description:
-  //       'Report whether siteglide-cli sync/watch is active for this MCP project directory. ' +
-  //       'Aggregates all live syncs (different envs may run together). ' +
-  //       'Use treatAsProduction: if true, follow production sync safety elicitation before editing. ' +
-  //       'Clears stale status files whose process pid is no longer alive. ' +
-  //       'Do not infer sync from IDE terminal metadata.',
-  //     inputSchema: {}
-  //   },
-  //   async () => {
-  //     try {
-  //       const status = getSyncStatus({
-  //         projectDir,
-  //         configPath:
-  //           !opts.configPath && !process.env.CONFIG_FILE_PATH
-  //             ? join(projectDir, '.siteglide-config')
-  //             : configPath
-  //       });
-  //       log(
-  //         `sync_status: active=${status.active} treatAsProduction=${status.treatAsProduction} syncs=${status.syncs.length}`
-  //       );
-  //       return toolResult(status);
-  //     } catch (error) {
-  //       return toolError(error);
-  //     }
-  //   }
-  // );
+  server.registerTool(
+    'sync_status',
+    {
+      description:
+        'Report whether siteglide-cli sync/watch is active for this MCP project directory. ' +
+        'Aggregates all live syncs (different envs may run together). ' +
+        'Use treatAsProduction: if true, follow production sync safety elicitation before editing. ' +
+        'Clears stale status files whose process pid is no longer alive. ' +
+        'Do not infer sync from IDE terminal metadata.',
+      inputSchema: {}
+    },
+    async () => {
+      try {
+        const status = getSyncStatus({
+          projectDir,
+          configPath:
+            !opts.configPath && !process.env.CONFIG_FILE_PATH
+              ? join(projectDir, '.siteglide-config')
+              : configPath
+        });
+        log(
+          `sync_status: active=${status.active} treatAsProduction=${status.treatAsProduction} syncs=${status.syncs.length}`
+        );
+        return toolResult(status);
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
 
   server.registerTool(
     'graphql_exec',
