@@ -6,7 +6,7 @@ import { registerSiteglideTools } from '../siteglide/register.js';
 import { registerOpsTools } from '../ops/register.js';
 import { registerHealthTools } from '../ops/registerHealth.js';
 import { MCP_SERVER_INSTRUCTIONS } from '../ops/serverHealth.js';
-import { registerValidateCode } from './validateCode.js';
+import { registerValidateCode } from '@platformos/platformos-mcp-supervisor';
 
 const SERVER_NAME = 'siteglide-mcp';
 const DEFAULT_VERSION = '0.1.0';
@@ -23,7 +23,7 @@ function packageVersion() {
 
 /**
  * Build the composed MCP server (tools registered; transport not connected).
- * Uses platformOS check-node for validate_code (same engine as platformos-mcp-supervisor)
+ * Uses platformOS mcp-supervisor for validate_code (batch-aware write gate)
  * plus Siteglide rules and ops tools. Site root may be `app/` or legacy
  * `marketplace_builder/` (equivalent; pull does not rename).
  *

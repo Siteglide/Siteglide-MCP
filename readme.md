@@ -6,7 +6,7 @@ Experimental **Siteglide MCP server** for desktop AI agents (Cursor, Claude Code
 
 | Tool | Purpose | Auth / gates |
 | --- | --- | --- |
-| `validate_code` | Lint Liquid/GraphQL/YAML before write (platformOS check engine) | None (local FS) |
+| `validate_code` | Lint Liquid/GraphQL/YAML before write — single file or coordinated `files[]` batch (platformOS supervisor) | None (local FS) |
 | `siteglide_rules` | Load Siteglide agent rules | None |
 | `siteglide_guide` | Load short Siteglide convention guide | None |
 | `envs_list` | List envs with host; `details: true` adds `url` + `classification` (`staging`\|`production`) | Config (MCP only — never tokens/emails) |
@@ -16,7 +16,7 @@ Experimental **Siteglide MCP server** for desktop AI agents (Cursor, Claude Code
 
 **Secrets:** Agents must **never** read `.siteglide-config`. Always call `envs_list({ details: true })` before env-scoped ops. Ops tools load tokens internally.
 
-**Sync safety:** There is no MCP sync/conflict-status tool yet — published `siteglide-cli` does not write `.siteglide/sync` (or remote-check/merge/git) status files. Agents must ask the user (or read the CLI terminal) whether sync is running before editing production. The CLI refuses a second sync for the same environment in the same directory; different envs may run together.
+**Sync safety:** Call `sync_status` to detect live `siteglide-cli sync` (reads `.siteglide/user/sync/`). If unavailable, ask the user or read the CLI terminal. The CLI refuses a second sync for the same environment in the same directory; different envs may run together.
 
 **Classification:** MCP classifies from the site URL hostname (not the env key name). Staging hosts match `.staging-siteglide.com` / `.staging.oregon.platform-os.com`; everything else (including custom domains) is `production`.
 
@@ -36,7 +36,7 @@ siteglide-cli mcp --project .
 
 ## Compose model
 
-Depends on `@platformos/platformos-check-node` (same engine as `@platformos/platformos-mcp-supervisor`) without forking supervisor source. Siteglide owns stdio lifecycle, rules, and ops tools.
+Registers `validate_code` from `@platformos/platformos-mcp-supervisor` (^0.2.0 — batch-aware write gate). Siteglide owns stdio lifecycle, rules, and ops tools.
 
 ## Workspace role
 
