@@ -12,6 +12,7 @@ import { elicitProductionMutationConfirm } from './elicitConfirm.js';
 import { join } from 'node:path';
 import { getGitStatus } from './gitStatus.js';
 import { getSyncStatus } from './syncStatus.js';
+import { listInstalledModules } from './installedModules.js';
 // import { getRemoteCheckStatus } from './remoteCheckStatus.js';
 
 function toolResult(data) {
@@ -132,6 +133,32 @@ export function registerOpsTools(server, opts = {}) {
           `sync_status: active=${status.active} treatAsProduction=${status.treatAsProduction} syncs=${status.syncs.length}`
         );
         return toolResult(status);
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'modules_list',
+    {
+      description:
+        'List module machine names installed on a Siteglide site. ' +
+        'Uses the same GET /cli/list_modules call as siteglide-cli pull and siteglide-cli modules. ' +
+        'Call envs_list({ details: true }) first.',
+      annotations: { openWorldHint: true },
+      inputSchema: {
+        environment: z.string().describe('Environment name from .siteglide-config')
+      }
+    },
+    async (args) => {
+      try {
+        const result = await listInstalledModules({
+          environment: args.environment,
+          configPath
+        });
+        log(`modules_list: ${args.environment} count=${result.count}`);
+        return toolResult(result);
       } catch (error) {
         return toolError(error);
       }

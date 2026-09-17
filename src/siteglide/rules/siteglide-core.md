@@ -15,7 +15,8 @@
 # For GraphQL, Liquid (staging only), or logs, call graphql_exec / liquid_exec / logs_fetch with an environment name —
 # those tools load credentials internally. Do not invent shell/file workarounds that touch the config file.
 # Ops auth is Siteglide-CLI config via MCP only — never Partner Portal / pos-cli credentials.
-# Prefer Siteglide MCP tools (validate_code, siteglide_rules, siteglide_guide, server_health, envs_list, sync_status, git_status, ops) for Siteglide work.
+# Prefer Siteglide MCP tools (validate_code, siteglide_rules, siteglide_guide, server_health, envs_list, modules_list, sync_status, git_status, ops) for Siteglide work.
+# modules_list returns installed module machine names from the live site (same API as pull); use before pull/module work when the installed set is unknown.
 # validate_code: call BEFORE writing Liquid, GraphQL, or YAML. Pass one file as { file_path, content } OR send coordinated multi-file edits as { files: [{ file_path, content }, ...] } so partials and callers resolve together. Respect must_fix_before_write — do not write when true.
 # envs_list never returns tokens or emails.
 
