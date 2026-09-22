@@ -29,7 +29,7 @@ describe('audience', () => {
     assert.deepEqual(status.prompt.fields.git.options, ['beginner', 'advanced']);
   });
 
-  it('writes preferences under .siteglide/project/ and beginner language guidance', async () => {
+  it('writes preferences under .siteglide/user/about-me.json and beginner language guidance', async () => {
     const status = await getTargetAudience({
       projectDir: dir,
       answers: {

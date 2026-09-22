@@ -14,7 +14,7 @@ import { getGitStatus } from './gitStatus.js';
 import { getSyncStatus } from './syncStatus.js';
 import { listInstalledModules } from './installedModules.js';
 import { getTargetAudience } from './targetAudience.js';
-// import { getRemoteCheckStatus } from './remoteCheckStatus.js';
+import { getRemoteCheckStatus } from './remoteCheckStatus.js';
 
 function toolResult(data) {
   return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
@@ -61,34 +61,33 @@ export function registerOpsTools(server, opts = {}) {
     }
   );
 
-  // Uncomment when siteglide-cli writes .siteglide/sync, remote-check, merge, and git status files.
-  // server.registerTool(
-  //   'remote_check_status',
-  //   {
-  //     description:
-  //       'Read Siteglide CLI remote-mtime / merge-first / stash-pop conflict logs under .siteglide/ for this project. ' +
-  //       'Prefer this over IDE terminal scrollback when sync or deploy warns about remote conflicts. ' +
-  //       'recommendedActions[].id values are stable for agent branching (e.g. merge_first, resolve_conflicts).',
-  //     inputSchema: {
-  //       environment: z
-  //         .string()
-  //         .optional()
-  //         .describe('Optional environment name; omit to list all conflict logs')
-  //     }
-  //   },
-  //   async (args) => {
-  //     try {
-  //       const status = getRemoteCheckStatus({
-  //         projectDir,
-  //         environment: args?.environment
-  //       });
-  //       log(`remote_check_status: activeConflict=${status.activeConflict}`);
-  //       return toolResult(status);
-  //     } catch (error) {
-  //       return toolError(error);
-  //     }
-  //   }
-  // );
+  server.registerTool(
+    'remote_check_status',
+    {
+      description:
+        'Read Siteglide CLI remote-mtime / merge-first / stash-pop conflict logs under .siteglide/user/ for this project. ' +
+        'Prefer this over IDE terminal scrollback when sync or deploy warns about remote conflicts. ' +
+        'recommendedActions[].id values are stable for agent branching (e.g. merge_first, resolve_conflicts, commit_then_pull).',
+      inputSchema: {
+        environment: z
+          .string()
+          .optional()
+          .describe('Optional environment name; omit to list all conflict logs')
+      }
+    },
+    async (args) => {
+      try {
+        const status = getRemoteCheckStatus({
+          projectDir,
+          environment: args?.environment
+        });
+        log(`remote_check_status: activeConflict=${status.activeConflict}`);
+        return toolResult(status);
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
 
   server.registerTool(
     'git_status',
@@ -114,7 +113,7 @@ export function registerOpsTools(server, opts = {}) {
     'audience',
     {
       description:
-        'Read or fill `.siteglide/project/project-preferences.json` target_audience (role, git, Siteglide CLI). ' +
+        'Read or fill `.siteglide/user/about-me.json` target_audience (role, git, Siteglide CLI). ' +
         'Call early in a Siteglide session. If any value is null, prompt the user with the allowed options, then write the file. ' +
         'When complete, follow languageGuidance: define git terms for git beginners; explain sync/deploy/pull for Siteglide CLI beginners; ' +
         'pass role through and interpret it yourself. Pass answers here if the user already chose in chat (use siteglideCli for CLI experience).',

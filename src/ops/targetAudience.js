@@ -29,9 +29,9 @@ const CLI_DEFINITIONS = {
   pull: 'downloads the current site files onto your computer, overwriting local copies'
 };
 
-/** Team-shareable path — matches siteglide-cli `projectPreferences.js`. */
+/** User-local path — matches siteglide-cli `projectPreferences.js`. */
 export function preferencesPath(projectDir) {
-  return join(projectDir, '.siteglide', 'project', 'project-preferences.json');
+  return join(projectDir, '.siteglide', 'user', 'about-me.json');
 }
 
 function emptyAudience() {

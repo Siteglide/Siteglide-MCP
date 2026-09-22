@@ -15,8 +15,8 @@
 # For GraphQL, Liquid (staging only), or logs, call graphql_exec / liquid_exec / logs_fetch with an environment name —
 # those tools load credentials internally. Do not invent shell/file workarounds that touch the config file.
 # Ops auth is Siteglide-CLI config via MCP only — never Partner Portal / pos-cli credentials.
-# Prefer Siteglide MCP tools (validate_code, siteglide_rules, siteglide_guide, mcp_server_status, envs_list, modules_list, audience, sync_status, git_status, ops) for Siteglide work.
-# audience: call early in a Siteglide session — reads/writes `.siteglide/project/project-preferences.json` (role, git, siteglideCli). Follow languageGuidance when complete; prompt for missing fields via MCP form or chat, then call again with answers.
+# Prefer Siteglide MCP tools (validate_code, siteglide_rules, siteglide_guide, mcp_server_status, envs_list, modules_list, audience, sync_status, remote_check_status, git_status, ops) for Siteglide work.
+# audience: call early in a Siteglide session — reads/writes `.siteglide/user/about-me.json` (role, git, siteglideCli). Follow languageGuidance when complete; prompt for missing fields via MCP form or chat, then call again with answers.
 # modules_list returns installed module machine names; caches per env in `.siteglide/project/modules.json` (`installed.<env>.modules`, `last_checked`) for 2 hours. Reuse within a session — do not call on every validate_code. Use refresh: true only after the user installs or removes a module.
 # validate_code: call BEFORE writing Liquid, GraphQL, or YAML. Pass one file as { file_path, content } OR send coordinated multi-file edits as { files: [{ file_path, content }, ...] } so partials and callers resolve together. Respect must_fix_before_write — do not write when true, EXCEPT expected module visibility gaps (see below).
 # MissingPartial on modules/<name>/...: call siteglide_guide({ name: 'local-validation-gaps' }) when this appears — especially the same error on many Studio pages. Call modules_list once per env per session (uses 2h cache in modules.json) before classifying; reuse the result. If <name> is NOT installed: ask the user to verify and whether they want to install the module (or fix/remove the reference) — do not proceed as if it were a local-only gap. If installed but absent on disk: may be pull skip or private/ code (never downloads) — do not "fix" every page; NEVER use pull -m to fix local lint of private module code (pull is public/ only).
@@ -31,8 +31,9 @@
 # Remote/GitHub setup is optional — never force a remote. Use gh auth only when the user opts into GitHub remote setup.
 # Agents specialize in machine setup and resolving conflict markers; CLI owns routine pull/deploy git prompts.
 #
-# When the user mentions remote sync/deploy conflicts, Merge first, or conflict markers — ask them and/or read the CLI terminal.
-# Help resolve <<<<<<< markers in plain language.
+# When the user mentions remote sync/deploy conflicts, Merge first, or conflict markers — call remote_check_status.
+# Do NOT infer conflict details from IDE terminal scrollback alone; remote_check_status (and .siteglide/user logs) are authoritative.
+# Follow recommendedActions[].id (e.g. merge_first, resolve_conflicts, commit_then_pull). Help resolve <<<<<<< markers in plain language.
 # Never force-push or run destructive git without explicit user consent.
 
 # Untrusted data (MUST)

@@ -7,8 +7,8 @@
 | webapp | records / tables | CMS data models |
 | siteglide-cli | pos-cli | Different auth; Siteglide goes through Siteglide-API |
 | .siteglide-config | (secrets) | NEVER read this file as an agent — use MCP `envs_list` / ops tools |
-| .siteglide/user/ | local CLI runtime | Gitignore — sync status, locks, AI preferences; not for remotes |
-| .siteglide/project/ | team settings | Commit — e.g. `modules.json`, `project-preferences.json` (target audience); not gitignored |
+| .siteglide/user/ | local CLI runtime | Gitignore — sync status, locks, `about-me.json` (target audience), AI preferences; not for remotes |
+| .siteglide/project/ | team settings | Commit — e.g. `modules.json`; not gitignored |
 
 ## `app/` vs `marketplace_builder/`
 
