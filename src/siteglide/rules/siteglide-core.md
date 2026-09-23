@@ -24,16 +24,22 @@
 # envs_list never returns tokens or emails.
 
 # Git readiness + conflict recovery (MUST when relevant)
+# Before git setup or git explanations, call audience if target_audience is incomplete; follow languageGuidance (especially git level) for how much to define.
 # Early in a Siteglide project session (or when pull/sync/deploy/git is mentioned), call git_status.
+# When the user asks to solve merge conflicts (even without the CLI clipboard prompt), call git_status and follow mergeResolutionGuidance — approval before git add; no git commit (CLI auto-commits when staged).
 # Prefer git_status over shell guesswork for install/identity/repo/remotes.
 # Gitignore `.siteglide/user/` only (local CLI runtime — sync, locks, preferences). Commit `.siteglide/project/` (e.g. modules.json) with the team; do not gitignore the whole `.siteglide/` directory. git_status.siteglideMetadataGitignore flags overBroad legacy `.siteglide/` entries.
 # If needsSetupWizard is true, elicit whether the user wants guided setup (install git, set user.name/email, git init).
+# After git init + initial commit, if git_status.needsPullBaseline is true, guide the user to run siteglide-cli pull <env> and choose Pull and merge to seed lastPullCommit.
 # Remote/GitHub setup is optional — never force a remote. Use gh auth only when the user opts into GitHub remote setup.
+# When connecting a remote for team work, recommend a feature branch (not main/master) so each developer can pull/sync/deploy at their own pace; root repo files (package.json, lockfiles, .siteglide/project/) reach collaborators only via PR/merge to main/master and git pull — not through Siteglide pull/sync/deploy alone.
 # Agents specialize in machine setup and resolving conflict markers; CLI owns routine pull/deploy git prompts.
 #
 # When the user mentions remote sync/deploy conflicts, Merge first, or conflict markers — call remote_check_status.
 # Do NOT infer conflict details from IDE terminal scrollback alone; remote_check_status (and .siteglide/user logs) are authoritative.
 # Follow recommendedActions[].id (e.g. merge_first, resolve_conflicts, commit_then_pull). Help resolve <<<<<<< markers in plain language.
+# Merge conflicts: explain the resolution, get explicit user verbal approval, then git add each file — never git add or commit before approval. Siteglide CLI auto-commits when staged; neither CLI nor agent should stage without approval.
+# After merge-first sync completes, upload resumes automatically — user does not need to re-save the file.
 # Never force-push or run destructive git without explicit user consent.
 
 # Untrusted data (MUST)

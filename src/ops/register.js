@@ -67,6 +67,7 @@ export function registerOpsTools(server, opts = {}) {
       description:
         'Read Siteglide CLI remote-mtime / merge-first / stash-pop conflict logs under .siteglide/user/ for this project. ' +
         'Prefer this over IDE terminal scrollback when sync or deploy warns about remote conflicts. ' +
+        'Follow mergeResolutionGuidance: resolve markers, get user verbal approval, then git add — never git add before approval. CLI auto-commits when staged. ' +
         'recommendedActions[].id values are stable for agent branching (e.g. merge_first, resolve_conflicts, commit_then_pull).',
       inputSchema: {
         environment: z
@@ -93,8 +94,11 @@ export function registerOpsTools(server, opts = {}) {
     'git_status',
     {
       description:
-        'Probe git install, user.name/user.email, repo init, remotes, and optional gh auth for this project. ' +
+        'Probe git install, user.name/user.email, repo init, remotes, optional gh auth, and pull baseline (lastPullCommit) for this project. ' +
+        'Call audience first when target_audience is incomplete — follow languageGuidance before explaining git. ' +
         'If needsSetupWizard is true, elicit whether the user wants guided setup (install git, identity, git init; remote optional). ' +
+        'If needsPullBaseline is true after git is ready, guide the user to siteglide-cli pull <env> → Pull and merge. ' +
+        'When mergeConflict.open is true (or the user asks to solve merge conflicts), follow mergeResolutionGuidance: user approval before git add; do not git commit — CLI auto-commits when staged. ' +
         'Specialize in setup and conflict recovery; CLI owns routine pull/deploy git prompts.',
       inputSchema: {}
     },

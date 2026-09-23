@@ -77,6 +77,11 @@ function readJsonFile(projectDir, fileSegments) {
 	return null;
 }
 
+export const MERGE_CONFLICT_AGENT_GUIDANCE =
+  'Resolve conflict markers and explain the result. Do not git add or git commit until the user verbally approves. ' +
+  'After approval, git add each resolved file; Siteglide CLI auto-commits the merge when everything is staged. ' +
+  'On sync, upload resumes automatically after merge complete — no need to re-save the file.';
+
 /**
  * Read AI-readable remote-check / stash / sync conflict logs under `.siteglide/`.
  * @param {{ projectDir: string, environment?: string }} opts
@@ -106,6 +111,8 @@ export function getRemoteCheckStatus(opts) {
     agentGuidance:
       syncCurrentConflict?.agentGuidance ||
       (conflicts[0] && conflicts[0].agentGuidance) ||
-      'When activeConflict is true, call this tool instead of scraping the CLI terminal. Follow recommendedActions[].id when present.'
+      (activeConflict ? MERGE_CONFLICT_AGENT_GUIDANCE : undefined) ||
+      'When activeConflict is true, call this tool instead of scraping the CLI terminal. Follow recommendedActions[].id when present.',
+    mergeResolutionGuidance: MERGE_CONFLICT_AGENT_GUIDANCE
 	};
 }
