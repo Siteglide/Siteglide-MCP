@@ -24,7 +24,7 @@ export function isPidAlive(pid) {
  * @returns {string}
  */
 export function syncStatusDir(projectDir) {
-  return join(projectDir, '.siteglide', 'sync');
+  return join(projectDir, '.siteglide', 'user', 'sync');
 }
 
 /**
@@ -91,7 +91,7 @@ export function getSyncStatus(opts) {
   let staleCleared = 0;
 
   for (const name of names) {
-    if (!name.endsWith('.json')) {
+    if (!/^\d+\.json$/.test(name)) {
       continue;
     }
     const filePath = join(dir, name);

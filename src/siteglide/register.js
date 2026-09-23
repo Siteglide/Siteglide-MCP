@@ -10,7 +10,8 @@ const RULES = {
 };
 
 const GUIDES = {
-  conventions: join(__dirname, 'guides', 'conventions.md')
+  conventions: join(__dirname, 'guides', 'conventions.md'),
+  'local-validation-gaps': join(__dirname, 'guides', 'local-validation-gaps.md')
 };
 /**
  * @param {import('@modelcontextprotocol/sdk/server/mcp.js').McpServer} server
@@ -34,9 +35,12 @@ export function registerSiteglideTools(server) {
   server.registerTool(
     'siteglide_guide',
     {
-      description: 'Load a short Siteglide guidance doc (e.g. platformOS terminology conflicts).',
+      description: 'Load a short Siteglide guidance doc (conventions, local validation gaps for module MissingPartial, etc.).',
       inputSchema: {
-        name: z.enum(['conventions']).optional().describe('Guide name. Defaults to conventions.')
+        name: z
+          .enum(['conventions', 'local-validation-gaps'])
+          .optional()
+          .describe('Guide name. Defaults to conventions.')
       }
     },
     async (args) => {
