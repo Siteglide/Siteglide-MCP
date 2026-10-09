@@ -9,6 +9,7 @@
 | .siteglide-config | (secrets) | NEVER read this file as an agent — use MCP `envs_list` / ops tools |
 | .siteglide/user/ (project) | local CLI runtime | Gitignore — sync status, locks, AI preferences; not for remotes |
 | ../.siteglide/user/about-me.json | developer preferences | Parent of project root — target audience for AI; shared across sibling projects; gitignore at parent if needed |
+| ../.siteglide/user/ai-agent-preferences.json | developer preferences | Parent of project root — which AI agents pull/ai scaffolds; shared across sibling projects |
 | .siteglide/project/ | team settings | Commit — e.g. `modules.json`; not gitignored |
 
 ## `app/` vs `marketplace_builder/`

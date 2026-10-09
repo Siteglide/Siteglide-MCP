@@ -1,6 +1,15 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { canonicalizeTargetAudienceExperience } from './experienceLevel.js';
+import {
+  ensureDirWithLog,
+  formatFsError,
+  logParentUserMigrationFailure,
+  logParentUserMigrationPlan,
+  logParentUserMigrationSuccess,
+  logSharedUserPathResolutionOnce,
+  warnInconsistentParentUserState
+} from './parentUserFsLog.js';
 
 const SITEGLIDE_DIR = '.siteglide';
 const USER_DIR = 'user';
@@ -11,6 +20,75 @@ export const ABOUT_ME_REL = '../.siteglide/user/about-me.json';
 
 /** @type {Set<string>} */
 const migratedProjectDirs = new Set();
+
+function parentSiteglideUserDir(projectDir) {
+  return join(dirname(resolve(projectDir)), SITEGLIDE_DIR, USER_DIR);
+}
+
+function parentAboutMePath(projectDir) {
+  return join(parentSiteglideUserDir(projectDir), ABOUT_ME_FILE);
+}
+
+function ensureParentSiteglideUserDir(projectDir) {
+  const resolved = resolve(projectDir);
+  logSharedUserPathResolutionOnce(resolved, projectDir);
+  const dir = parentSiteglideUserDir(resolved);
+  const result = ensureDirWithLog(dir, 'Shared .siteglide/user', { cwd: projectDir });
+  if (!result.ok) {
+    throw new Error(`Could not create shared folder ${dir} (cwd=${resolve(projectDir)})`);
+  }
+}
+
+/**
+ * @param {string} from
+ * @param {string} to
+ * @param {string} contextLabel
+ */
+function moveFileSyncRobust(from, to, contextLabel) {
+  if (!existsSync(from)) {
+    return;
+  }
+
+  const dirResult = ensureDirWithLog(dirname(to), `${contextLabel} parent .siteglide/user`);
+  if (!dirResult.ok) {
+    throw new Error(`Could not create parent directory ${dirname(to)}`);
+  }
+
+  if (existsSync(to)) {
+    return;
+  }
+
+  let renameError = null;
+  try {
+    renameSync(from, to);
+    if (existsSync(to)) {
+      logParentUserMigrationSuccess(contextLabel, to, 'moved (rename)');
+      return;
+    }
+  } catch (error) {
+    renameError = error;
+  }
+
+  try {
+    copyFileSync(from, to);
+  } catch (error) {
+    const renameDetail = renameError ? formatFsError(renameError) : 'not attempted';
+    throw new Error(`rename (${renameDetail}) and copy (${formatFsError(error)}) failed`);
+  }
+
+  if (!existsSync(to)) {
+    throw new Error(`Could not move ${from} to ${to}`);
+  }
+  unlinkSync(from);
+  logParentUserMigrationSuccess(contextLabel, to, 'moved (copy)');
+}
+
+function parentUserMigrationSettled(resolved, legacyPath) {
+  if (!migratedProjectDirs.has(resolved)) {
+    return false;
+  }
+  return !existsSync(legacyPath);
+}
 
 /**
  * @param {unknown} ta
@@ -25,7 +103,10 @@ function normalizeTargetAudience(ta) {
  * @param {{ role: string|null, git: string|null, siteglideCli: string|null }} ta
  */
 function writeAboutMeTargetAudience(filePath, ta) {
-  mkdirSync(dirname(filePath), { recursive: true });
+  const dirResult = ensureDirWithLog(dirname(filePath), 'about-me.json parent .siteglide/user');
+  if (!dirResult.ok) {
+    throw new Error(`Could not create directory for ${filePath}`);
+  }
   writeFileSync(
     filePath,
     `${JSON.stringify({ target_audience: canonicalizeTargetAudienceExperience(ta) }, null, 2)}\n`,
@@ -74,7 +155,8 @@ export function legacyAboutMePath(projectDir) {
 /** Parent-of-project about-me path — matches siteglide-cli `joinAboutMe`. */
 export function aboutMePath(projectDir) {
   migrateAboutMeToParent(projectDir);
-  return join(dirname(resolve(projectDir)), SITEGLIDE_DIR, USER_DIR, ABOUT_ME_FILE);
+  ensureParentSiteglideUserDir(projectDir);
+  return parentAboutMePath(projectDir);
 }
 
 /**
@@ -83,55 +165,62 @@ export function aboutMePath(projectDir) {
  */
 export function migrateAboutMeToParent(projectDir) {
   const resolved = resolve(projectDir);
-  if (migratedProjectDirs.has(resolved)) {
-    return;
-  }
-  migratedProjectDirs.add(resolved);
-
   const legacyPath = legacyAboutMePath(resolved);
-  const parentPath = join(dirname(resolved), SITEGLIDE_DIR, USER_DIR, ABOUT_ME_FILE);
+  const parentPath = parentAboutMePath(resolved);
 
   if (legacyPath === parentPath) {
+    migratedProjectDirs.add(resolved);
     return;
   }
 
-  const legacyExists = existsSync(legacyPath);
-  const parentExists = existsSync(parentPath);
-
-  if (!legacyExists) {
+  if (parentUserMigrationSettled(resolved, legacyPath)) {
+    if (!existsSync(parentPath)) {
+      warnInconsistentParentUserState('about-me.json', resolved, legacyPath, parentPath);
+    }
     return;
   }
 
-  if (!parentExists) {
-    mkdirSync(dirname(parentPath), { recursive: true });
-    try {
-      renameSync(legacyPath, parentPath);
-    } catch {
-      try {
-        copyFileSync(legacyPath, parentPath);
+  if (!existsSync(legacyPath)) {
+    migratedProjectDirs.add(resolved);
+    return;
+  }
+
+  logParentUserMigrationPlan('about-me.json', resolved, legacyPath, parentPath);
+
+  try {
+    if (!existsSync(parentPath)) {
+      moveFileSyncRobust(legacyPath, parentPath, 'about-me.json');
+    } else {
+      const merged = mergeTargetAudience(
+        readAboutMeFile(parentPath)?.target_audience || normalizeTargetAudience(null),
+        readAboutMeFile(legacyPath)?.target_audience || normalizeTargetAudience(null)
+      );
+      writeAboutMeTargetAudience(parentPath, merged);
+      if (existsSync(parentPath)) {
         unlinkSync(legacyPath);
-      } catch {
-        // Reads fall back to the legacy path.
+        logParentUserMigrationSuccess(
+          'about-me.json',
+          parentPath,
+          'merged project copy into existing parent file'
+        );
       }
     }
+
     if (existsSync(parentPath)) {
       const doc = readAboutMeFile(parentPath);
       if (doc) {
         writeAboutMeTargetAudience(parentPath, doc.target_audience);
       }
     }
-    return;
-  }
 
-  const merged = mergeTargetAudience(
-    readAboutMeFile(parentPath)?.target_audience || normalizeTargetAudience(null),
-    readAboutMeFile(legacyPath)?.target_audience || normalizeTargetAudience(null)
-  );
-  writeAboutMeTargetAudience(parentPath, merged);
-  try {
-    unlinkSync(legacyPath);
-  } catch {
-    // Parent copy is authoritative.
+    if (!existsSync(legacyPath)) {
+      migratedProjectDirs.add(resolved);
+    } else {
+      warnInconsistentParentUserState('about-me.json', resolved, legacyPath, parentPath);
+    }
+  } catch (error) {
+    logParentUserMigrationFailure('about-me.json', resolved, legacyPath, parentPath, error);
+    warnInconsistentParentUserState('about-me.json', resolved, legacyPath, parentPath);
   }
 }
 
@@ -141,7 +230,7 @@ export function migrateAboutMeToParent(projectDir) {
  */
 export function resolveReadableAboutMePath(projectDir) {
   migrateAboutMeToParent(projectDir);
-  const parentPath = aboutMePath(projectDir);
+  const parentPath = parentAboutMePath(projectDir);
   if (existsSync(parentPath)) {
     return parentPath;
   }
