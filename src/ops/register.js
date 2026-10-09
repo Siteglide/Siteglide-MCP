@@ -117,17 +117,17 @@ export function registerOpsTools(server, opts = {}) {
     'audience',
     {
       description:
-        'Read or fill `.siteglide/user/about-me.json` target_audience (role, git, Siteglide CLI). ' +
+        'Read or fill `../.siteglide/user/about-me.json` target_audience (role, git, Siteglide CLI). ' +
         'Call early in a Siteglide session. If any value is null, prompt the user with the allowed options, then write the file. ' +
-        'When complete, follow languageGuidance: define git terms for git beginners; explain sync/deploy/pull for Siteglide CLI beginners; ' +
+        'When complete, follow languageGuidance: define git terms when git level is extra help; explain sync/deploy/pull when Siteglide CLI level is extra help; ' +
         'pass role through and interpret it yourself. Pass answers here if the user already chose in chat (use siteglideCli for CLI experience).',
       inputSchema: {
         role: z
           .string()
           .optional()
           .describe('designer | business leader | developer | tester | marketing | seo | support | other'),
-        git: z.string().optional().describe('beginner | advanced'),
-        siteglideCli: z.string().optional().describe('Siteglide CLI experience: beginner | advanced')
+        git: z.string().optional().describe('extra help | familiar (legacy: beginner | advanced)'),
+        siteglideCli: z.string().optional().describe('Siteglide CLI: extra help | familiar (legacy: beginner | advanced)')
       }
     },
     async (args) => {

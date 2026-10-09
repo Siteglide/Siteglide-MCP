@@ -1,5 +1,17 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+import {
+  ABOUT_ME_REL,
+  aboutMePath,
+  migrateAboutMeToParent,
+  resolveReadableAboutMePath
+} from '../siteglide/aboutMePath.js';
+import {
+  EXPERIENCE_OPTIONS,
+  canonicalizeTargetAudienceExperience,
+  normalizeExperienceLevel,
+  wantsExtraHelp
+} from '../siteglide/experienceLevel.js';
 
 export const ROLE_OPTIONS = [
   'designer',
@@ -12,7 +24,7 @@ export const ROLE_OPTIONS = [
   'other'
 ];
 
-export const EXPERIENCE_OPTIONS = ['beginner', 'advanced'];
+export { EXPERIENCE_OPTIONS };
 
 const GIT_DEFINITIONS = {
   repo: 'a local folder git is tracking (your project history lives here)',
@@ -31,8 +43,10 @@ const CLI_DEFINITIONS = {
 
 /** User-local path — matches siteglide-cli `projectPreferences.js`. */
 export function preferencesPath(projectDir) {
-  return join(projectDir, '.siteglide', 'user', 'about-me.json');
+  return aboutMePath(projectDir);
 }
+
+export { ABOUT_ME_REL };
 
 function emptyAudience() {
   return { role: null, git: null, siteglideCli: null };
@@ -57,22 +71,16 @@ function normalizeChoice(value, allowed) {
  * @returns {{ target_audience: { role: string|null, git: string|null, siteglideCli: string|null } }}
  */
 export function readProjectPreferences(projectDir) {
-  const filePath = preferencesPath(projectDir);
+  migrateAboutMeToParent(projectDir);
+  const filePath = resolveReadableAboutMePath(projectDir);
   const fallback = { target_audience: emptyAudience() };
-  if (!existsSync(filePath)) {
-    return fallback;
-  }
   try {
     const data = JSON.parse(readFileSync(filePath, 'utf8'));
     const ta = data && data.target_audience && typeof data.target_audience === 'object'
       ? data.target_audience
       : {};
     return {
-      target_audience: {
-        role: ta.role == null ? null : ta.role,
-        git: ta.git == null ? null : ta.git,
-        siteglideCli: ta.siteglideCli == null ? null : ta.siteglideCli
-      }
+      target_audience: canonicalizeTargetAudienceExperience(ta)
     };
   } catch {
     return fallback;
@@ -84,14 +92,17 @@ export function readProjectPreferences(projectDir) {
  * @param {{ role?: string|null, git?: string|null, siteglideCli?: string|null }} audience
  */
 export function writeProjectPreferences(projectDir, audience) {
-  const filePath = preferencesPath(projectDir);
+  migrateAboutMeToParent(projectDir);
+  const filePath = aboutMePath(projectDir);
   const current = readProjectPreferences(projectDir).target_audience;
   const next = {
-    target_audience: {
+    target_audience: canonicalizeTargetAudienceExperience({
       role: audience.role !== undefined ? audience.role : current.role,
-      git: audience.git !== undefined ? audience.git : current.git,
-      siteglideCli: audience.siteglideCli !== undefined ? audience.siteglideCli : current.siteglideCli
-    }
+      git: audience.git !== undefined ? normalizeExperienceLevel(audience.git) ?? current.git : current.git,
+      siteglideCli: audience.siteglideCli !== undefined
+        ? normalizeExperienceLevel(audience.siteglideCli) ?? current.siteglideCli
+        : current.siteglideCli
+    })
   };
   mkdirSync(dirname(filePath), { recursive: true });
   writeFileSync(filePath, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
@@ -120,25 +131,25 @@ export function missingAudienceFields(audience) {
  * @param {{ role: string|null, git: string|null, siteglideCli: string|null }} audience
  */
 export function buildLanguageGuidance(audience) {
-  const gitBeginner = audience.git === 'beginner';
-  const cliBeginner = audience.siteglideCli === 'beginner';
+  const gitExtraHelp = wantsExtraHelp(audience.git);
+  const cliExtraHelp = wantsExtraHelp(audience.siteglideCli);
   return {
     role: audience.role,
     roleInstruction:
       'The user\'s overall role is provided for context. Interpret it yourself when choosing tone, examples, and how much CMS vs code detail to include.',
     git: {
       level: audience.git,
-      defineWhenSpeaking: gitBeginner ? GIT_DEFINITIONS : null,
-      instruction: gitBeginner
-        ? 'User is a git beginner. When asking questions or reporting git status, include short definitions of: repo, remote, commit, merge, stash, branch.'
-        : 'User is advanced in git. Use normal git terms without extra definitions unless they ask.'
+      defineWhenSpeaking: gitExtraHelp ? GIT_DEFINITIONS : null,
+      instruction: gitExtraHelp
+        ? 'User wants extra help with git terms. When asking questions or reporting git status, include short definitions of: repo, remote, commit, merge, stash, branch.'
+        : 'User is familiar with git. Use normal git terms without extra definitions unless they ask.'
     },
     siteglideCli: {
       level: audience.siteglideCli,
-      defineWhenSpeaking: cliBeginner ? CLI_DEFINITIONS : null,
-      instruction: cliBeginner
-        ? 'User is a Siteglide CLI beginner. When mentioning sync, deploy, or pull, include a concise explanation of that command.'
-        : 'User is advanced with Siteglide CLI. Use normal CLI terms without extra definitions unless they ask.'
+      defineWhenSpeaking: cliExtraHelp ? CLI_DEFINITIONS : null,
+      instruction: cliExtraHelp
+        ? 'User wants extra help with Siteglide CLI. When mentioning sync, deploy, or pull, include a concise explanation of that command.'
+        : 'User is familiar with Siteglide CLI. Use normal CLI terms without extra definitions unless they ask.'
     }
   };
 }
@@ -166,16 +177,16 @@ async function elicitAudienceForm(mcpServer, missing) {
   if (missing.includes('git')) {
     properties.git = {
       type: 'string',
-      title: 'Git experience',
-      description: 'How familiar are you with git (the local version-control tool, not GitHub)?',
+      title: 'Git explanations',
+      description: 'When we explain git (local version control, not GitHub), do you want extra help with terms or are you familiar?',
       enum: EXPERIENCE_OPTIONS
     };
   }
   if (missing.includes('siteglideCli')) {
     properties.siteglideCli = {
       type: 'string',
-      title: 'Siteglide CLI',
-      description: 'How familiar are you with Siteglide CLI (pull, sync, deploy)?',
+      title: 'Siteglide CLI explanations',
+      description: 'When we explain Siteglide CLI (pull, sync, deploy), do you want extra help or are you familiar?',
       enum: EXPERIENCE_OPTIONS
     };
   }
@@ -184,7 +195,7 @@ async function elicitAudienceForm(mcpServer, missing) {
     mode: 'form',
     message:
       'Tell Siteglide how you work so the assistant can match your experience. ' +
-      'Pick a role and whether you are a beginner or advanced with git and Siteglide CLI.',
+      'Pick a role and for git and Siteglide CLI choose extra help or familiar.',
     requestedSchema: {
       type: 'object',
       properties,
@@ -212,8 +223,8 @@ export async function getTargetAudience(opts) {
 
   const applied = {
     role: normalizeChoice(answers.role, ROLE_OPTIONS) ?? current.role,
-    git: normalizeChoice(answers.git, EXPERIENCE_OPTIONS) ?? current.git,
-    siteglideCli: normalizeChoice(answers.siteglideCli, EXPERIENCE_OPTIONS) ?? current.siteglideCli
+    git: normalizeExperienceLevel(answers.git) ?? current.git,
+    siteglideCli: normalizeExperienceLevel(answers.siteglideCli) ?? current.siteglideCli
   };
 
   let missing = missingAudienceFields(applied);
@@ -224,9 +235,8 @@ export async function getTargetAudience(opts) {
       const elicited = await elicitAudienceForm(server, missing);
       if (elicited.ok) {
         applied.role = normalizeChoice(elicited.content.role, ROLE_OPTIONS) ?? applied.role;
-        applied.git = normalizeChoice(elicited.content.git, EXPERIENCE_OPTIONS) ?? applied.git;
-        applied.siteglideCli =
-          normalizeChoice(elicited.content.siteglideCli, EXPERIENCE_OPTIONS) ?? applied.siteglideCli;
+        applied.git = normalizeExperienceLevel(elicited.content.git) ?? applied.git;
+        applied.siteglideCli = normalizeExperienceLevel(elicited.content.siteglideCli) ?? applied.siteglideCli;
         missing = missingAudienceFields(applied);
       } else {
         elicitError = elicited.reason;
