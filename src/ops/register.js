@@ -10,7 +10,7 @@ import {
 } from './security.js';
 import { elicitProductionMutationConfirm } from './elicitConfirm.js';
 import { join } from 'node:path';
-import { getGitStatus } from './gitStatus.js';
+import { getGitStatus, GIT_STATUS_TOOL_DESCRIPTION } from './gitStatus.js';
 import { getSyncStatus } from './syncStatus.js';
 import { getSyncErrors } from './syncErrors.js';
 import { listInstalledModules } from './installedModules.js';
@@ -94,13 +94,7 @@ export function registerOpsTools(server, opts = {}) {
   server.registerTool(
     'git_status',
     {
-      description:
-        'Probe git install, user.name/user.email, repo init, remotes, optional gh auth, and pull baseline (lastPullCommit) for this project. ' +
-        'Call audience (read-only) for languageGuidance before explaining git. ' +
-        'If needsSetupWizard is true, elicit whether the user wants guided setup (install git, identity, git init; remote optional). ' +
-        'If needsPullBaseline is true after git is ready, guide the user to siteglide-cli pull <env> → Pull and merge. ' +
-        'When mergeConflict.open is true (or the user asks to solve merge conflicts), follow mergeResolutionGuidance: user approval before git add; do not git commit — CLI auto-commits when staged. ' +
-        'Specialize in setup and conflict recovery; CLI owns routine pull/deploy git prompts.',
+      description: GIT_STATUS_TOOL_DESCRIPTION,
       inputSchema: {}
     },
     async () => {

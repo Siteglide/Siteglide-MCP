@@ -8,8 +8,10 @@ import {
   getPullBaselineStatus,
   listPullBaselines,
   GIT_AUDIENCE_GUIDANCE,
+  GIT_STATUS_TOOL_DESCRIPTION,
   MERGE_CONFLICT_RESOLUTION_GUIDANCE,
-  REMOTE_SETUP_GUIDANCE
+  REMOTE_SETUP_GUIDANCE,
+  SITEGLIDE_USER_GITIGNORE_INSTRUCTION
 } from '../../src/ops/gitStatus.js';
 import { spawnSync } from 'node:child_process';
 
@@ -122,6 +124,27 @@ describe('gitStatus mergeResolutionGuidance', () => {
       assert.equal(status.mergeResolutionGuidance, MERGE_CONFLICT_RESOLUTION_GUIDANCE);
       assert.match(status.guidance, /verbal approval before git add/);
       assert.deepEqual(status.mergeConflict.unmergedPaths, ['a.txt']);
+    } finally {
+      rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('gitStatus siteglide user gitignore', () => {
+  it('tool description tells agents to gitignore .siteglide/user/', () => {
+    assert.match(GIT_STATUS_TOOL_DESCRIPTION, /\.siteglide\/user\//);
+    assert.match(GIT_STATUS_TOOL_DESCRIPTION, /all files inside/);
+  });
+
+  it('adds .siteglide/user/ via gitignoreEnsure and surfaces instruction on fresh repo', () => {
+    const projectDir = mkdtempSync(join(tmpdir(), 'sg-git-status-gitignore-'));
+    try {
+      gitInit(projectDir);
+      const status = getGitStatus({ projectDir });
+      assert.equal(status.siteglideUserGitignoreInstruction, SITEGLIDE_USER_GITIGNORE_INSTRUCTION);
+      assert.match(status.guidance, /\.siteglide\/user\//);
+      assert.ok(status.gitignore);
+      assert.ok(status.gitignore.added.includes('.siteglide/user/'));
     } finally {
       rmSync(projectDir, { recursive: true, force: true });
     }

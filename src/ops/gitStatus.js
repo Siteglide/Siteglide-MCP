@@ -36,6 +36,24 @@ export const MERGE_CONFLICT_RESOLUTION_GUIDANCE =
   'Do not git commit — siteglide-cli polls git and auto-commits the merge when every resolved file is staged and no unmerged paths remain. ' +
   'On sync, upload resumes automatically after the CLI finishes the merge.';
 
+/** Agent-facing instruction: gitignore `.siteglide/user/` and everything under it. */
+export const SITEGLIDE_USER_GITIGNORE_INSTRUCTION =
+  'Ensure `.gitignore` lists `.siteglide/user/` so the entire folder and all files inside it are ignored (local CLI runtime — sync, locks, preferences; not for remotes). ' +
+  'Also list `.siteglide-config` (secrets). ' +
+  'Do not gitignore the whole `.siteglide/` directory — `.siteglide/project/` (for example modules.json) should be committed with the team. ' +
+  'If anything under `.siteglide/user/` is still tracked after updating `.gitignore`, run `git rm -r --cached .siteglide/user/` and commit. ' +
+  'If `.gitignore` currently lists `.siteglide/`, replace it with `.siteglide/user/` so project settings stay shareable.';
+
+export const GIT_STATUS_TOOL_DESCRIPTION =
+  'Probe git install, user.name/user.email, repo init, remotes, optional gh auth, and pull baseline (lastPullCommit) for this project. ' +
+  'Call audience (read-only) for languageGuidance before explaining git. ' +
+  'During git setup, always ensure `.gitignore` lists `.siteglide/user/` (entire folder and all files inside — local CLI runtime, not for remotes) and `.siteglide-config`; follow guidance, siteglideUserGitignoreInstruction, siteglideMetadataGitignore, and gitignoreEnsure in the tool result. ' +
+  'If paths under `.siteglide/user/` are already tracked, untrack with `git rm -r --cached .siteglide/user/` before commit. Keep `.siteglide/project/` committable — do not gitignore all of `.siteglide/`. ' +
+  'If needsSetupWizard is true, elicit whether the user wants guided setup (install git, identity, git init; remote optional). ' +
+  'If needsPullBaseline is true after git is ready, guide the user to siteglide-cli pull <env> → Pull and merge. ' +
+  'When mergeConflict.open is true (or the user asks to solve merge conflicts), follow mergeResolutionGuidance: user approval before git add; do not git commit — CLI auto-commits when staged. ' +
+  'Specialize in setup and conflict recovery; CLI owns routine pull/deploy git prompts.';
+
 export const REMOTE_SETUP_GUIDANCE =
   'If the user opts into connecting a GitHub remote, elicit before acting: ' +
   '(a) which organisation or personal account, (b) new vs existing repo ' +
@@ -199,11 +217,7 @@ export function getGitStatus(opts) {
     };
   }
 
-  const siteglideGitignoreGuidance =
-    'Ensure .gitignore lists `.siteglide/user/` (local CLI runtime — sync, locks, preferences; not for remotes) and `.siteglide-config` (secrets). ' +
-    'Do not gitignore the whole `.siteglide/` directory — `.siteglide/project/` (for example modules.json) should be committed with the team. ' +
-    'If `.siteglide/user/` is still tracked after updating .gitignore, run `git rm -r --cached .siteglide/user/` and commit. ' +
-    'If `.gitignore` currently lists `.siteglide/`, replace it with `.siteglide/user/` so project settings stay shareable.';
+  const siteglideGitignoreGuidance = SITEGLIDE_USER_GITIGNORE_INSTRUCTION;
 
   const initialCommitGuidance =
     'After git init (or when the repo has no commits yet), unless the user explicitly opts out: ' +
@@ -260,8 +274,13 @@ export function getGitStatus(opts) {
         guidance +=
           ` Replace any broad \`.siteglide/\` gitignore entry with \`${SITEGLIDE_USER_GITIGNORE_ENTRY}\` so \`${SITEGLIDE_PROJECT_GITIGNORE_PROBE}\` can stay tracked.`;
       }
+    } else if (repoInitialized) {
+      guidance += ` ${siteglideGitignoreGuidance}`;
     }
   }
+
+  const siteglideUserGitignoreInstruction =
+    needsSetupWizard || repoInitialized ? SITEGLIDE_USER_GITIGNORE_INSTRUCTION : undefined;
 
   const pullBaseline = repoInitialized ? getPullBaselineStatus(cwd) : undefined;
   const pullBaselineGuidance =
@@ -312,6 +331,7 @@ export function getGitStatus(opts) {
     setupOffer,
     gitignore,
     siteglideMetadataGitignore,
+    siteglideUserGitignoreInstruction,
     initialCommitGuidance: needsSetupWizard || remotes.length === 0 ? initialCommitGuidance : undefined,
     remoteSetupGuidance: remotes.length === 0 || needsSetupWizard ? remoteSetupGuidance : undefined
   };

@@ -28,7 +28,7 @@
 # Early in a Siteglide project session (or when pull/sync/deploy/git is mentioned), call git_status.
 # When the user asks to solve merge conflicts (even without the CLI clipboard prompt), call git_status and follow mergeResolutionGuidance — approval before git add; no git commit (CLI auto-commits when staged).
 # Prefer git_status over shell guesswork for install/identity/repo/remotes.
-# Gitignore `.siteglide/user/` only (local CLI runtime — sync, locks, preferences). Commit `.siteglide/project/` (e.g. modules.json) with the team; do not gitignore the whole `.siteglide/` directory. git_status.siteglideMetadataGitignore flags overBroad legacy `.siteglide/` entries.
+# Gitignore `.siteglide/user/` only — the whole folder and all files inside (local CLI runtime — sync, locks, preferences). Commit `.siteglide/project/` (e.g. modules.json) with the team; do not gitignore the whole `.siteglide/` directory. git_status.siteglideUserGitignoreInstruction and siteglideMetadataGitignore flag overBroad legacy `.siteglide/` entries.
 # If needsSetupWizard is true, elicit whether the user wants guided setup (install git, set user.name/email, git init).
 # After git init + initial commit, if git_status.needsPullBaseline is true, guide the user to run siteglide-cli pull <env> and choose Pull and merge to seed lastPullCommit.
 # Remote/GitHub setup is optional — never force a remote. Use gh auth only when the user opts into GitHub remote setup.
