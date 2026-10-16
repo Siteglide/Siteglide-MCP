@@ -22,8 +22,8 @@ const PULL_BASELINE_GUIDANCE =
  * Call audience before git setup or explanations so language matches the user's experience.
  */
 export const GIT_AUDIENCE_GUIDANCE =
-  'Before explaining git or running guided setup, call the Siteglide MCP audience tool if target_audience is incomplete. ' +
-  'Follow languageGuidance from audience (especially target_audience.git) to choose how much technical language to use and whether to define terms such as repo, remote, commit, merge, branch, stash, and PR.';
+  'Call the Siteglide MCP audience tool (read-only) for languageGuidance before explaining git. ' +
+  'Do not ask the user profile or help-mode questions — if audience.complete is false, suggest siteglide-cli pull or editing about-me.json.';
 
 /**
  * Shown when git is ready locally but no remote is configured (or during setup wizard).

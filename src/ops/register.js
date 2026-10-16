@@ -12,6 +12,7 @@ import { elicitProductionMutationConfirm } from './elicitConfirm.js';
 import { join } from 'node:path';
 import { getGitStatus } from './gitStatus.js';
 import { getSyncStatus } from './syncStatus.js';
+import { getSyncErrors } from './syncErrors.js';
 import { listInstalledModules } from './installedModules.js';
 import { getTargetAudience } from './targetAudience.js';
 import { getRemoteCheckStatus } from './remoteCheckStatus.js';
@@ -95,7 +96,7 @@ export function registerOpsTools(server, opts = {}) {
     {
       description:
         'Probe git install, user.name/user.email, repo init, remotes, optional gh auth, and pull baseline (lastPullCommit) for this project. ' +
-        'Call audience first when target_audience is incomplete — follow languageGuidance before explaining git. ' +
+        'Call audience (read-only) for languageGuidance before explaining git. ' +
         'If needsSetupWizard is true, elicit whether the user wants guided setup (install git, identity, git init; remote optional). ' +
         'If needsPullBaseline is true after git is ready, guide the user to siteglide-cli pull <env> → Pull and merge. ' +
         'When mergeConflict.open is true (or the user asks to solve merge conflicts), follow mergeResolutionGuidance: user approval before git add; do not git commit — CLI auto-commits when staged. ' +
@@ -117,29 +118,15 @@ export function registerOpsTools(server, opts = {}) {
     'audience',
     {
       description:
-        'Read or fill `../.siteglide/user/about-me.json` target_audience (role, git, Siteglide CLI). ' +
-        'Call early in a Siteglide session. If any value is null, prompt the user with the allowed options, then write the file. ' +
-        'When complete, follow languageGuidance: define git terms when git level is extra help; explain sync/deploy/pull when Siteglide CLI level is extra help; ' +
-        'pass role through and interpret it yourself. Pass answers here if the user already chose in chat (use siteglideCli for CLI experience).',
-      inputSchema: {
-        role: z
-          .string()
-          .optional()
-          .describe('designer | business leader | developer | tester | marketing | seo | support | other'),
-        git: z.string().optional().describe('extra help | familiar (legacy: beginner | advanced)'),
-        siteglideCli: z.string().optional().describe('Siteglide CLI: extra help | familiar (legacy: beginner | advanced)')
-      }
+        'Read-only: `../.siteglide/user/about-me.json` target_audience (git and Siteglide CLI help mode). ' +
+        'Call early for languageGuidance. Does not write the file or ask the user questions — siteglide-cli pull sets help mode once. ' +
+        'When complete, follow languageGuidance. If incomplete, use hint and do not interrogate the user.',
+      inputSchema: {}
     },
-    async (args) => {
+    async () => {
       try {
         const status = await getTargetAudience({
-          projectDir,
-          server,
-          answers: {
-            role: args?.role,
-            git: args?.git,
-            siteglideCli: args?.siteglideCli
-          }
+          projectDir
         });
         log(`audience: complete=${status.complete} missing=${(status.missing || []).join(',')}`);
         return toolResult(status);
@@ -173,6 +160,49 @@ export function registerOpsTools(server, opts = {}) {
           `sync_status: active=${status.active} treatAsProduction=${status.treatAsProduction} syncs=${status.syncs.length}`
         );
         return toolResult(status);
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'sync_errors',
+    {
+      description:
+        'Read Siteglide sync validation and API upload failures recorded by siteglide-cli watch. ' +
+        'Sources .siteglide/user/sync/{pid}.json syncErrors while that sync process is still alive. ' +
+        'Use with sync_status to see active watches. Optional since/until filter error at timestamps (ISO 8601). ' +
+        'Does not scrape the terminal and does not delete stale pid files.',
+      inputSchema: {
+        since: z
+          .string()
+          .optional()
+          .describe('Include errors where at >= since (ISO 8601 date-time)'),
+        until: z
+          .string()
+          .optional()
+          .describe('Include errors where at <= until (ISO 8601 date-time)'),
+        environment: z
+          .string()
+          .optional()
+          .describe('Restrict to one environment name from .siteglide-config')
+      }
+    },
+    async (args) => {
+      try {
+        const result = getSyncErrors({
+          projectDir,
+          configPath:
+            !opts.configPath && !process.env.CONFIG_FILE_PATH
+              ? join(projectDir, '.siteglide-config')
+              : configPath,
+          since: args?.since,
+          until: args?.until,
+          environment: args?.environment
+        });
+        log(`sync_errors: activeSyncs=${result.activeSyncs} errors=${result.errors.length}`);
+        return toolResult(result);
       } catch (error) {
         return toolError(error);
       }

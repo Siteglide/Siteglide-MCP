@@ -1,13 +1,14 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   getTargetAudience,
   readProjectPreferences,
   buildLanguageGuidance,
-  preferencesPath
+  preferencesPath,
+  writeProjectPreferences
 } from '../../src/ops/targetAudience.js';
 
 describe('audience', () => {
@@ -24,44 +25,46 @@ describe('audience', () => {
     rmSync(parentDir, { recursive: true, force: true });
   });
 
-  it('returns a prompt when values are null', async () => {
+  it('read-only getTargetAudience reports missing git and siteglideCli without role', async () => {
     const status = await getTargetAudience({ projectDir: dir });
     assert.equal(status.complete, false);
-    assert.deepEqual(status.missing, ['role', 'git', 'siteglideCli']);
-    assert.equal(status.prompt.fields.role.options.includes('developer'), true);
-    assert.deepEqual(status.prompt.fields.git.options, ['extra help', 'familiar']);
+    assert.equal(status.readOnly, true);
+    assert.deepEqual(status.missing, ['git', 'siteglideCli']);
+    assert.equal(status.prompt, undefined);
+    assert.equal(typeof status.hint, 'string');
+    assert.equal(status.hint.includes('siteglide-cli pull'), true);
   });
 
-  it('writes preferences under parent .siteglide/user/about-me.json and extra-help language guidance', async () => {
-    const status = await getTargetAudience({
-      projectDir: dir,
-      answers: {
-        role: 'Designer',
-        git: 'extra help',
-        siteglideCli: 'extra help'
-      }
+  it('read-only getTargetAudience does not write when preferences were empty', async () => {
+    await getTargetAudience({ projectDir: dir });
+    assert.throws(() => readFileSync(preferencesPath(dir), 'utf8'));
+  });
+
+  it('returns complete audience and language guidance when help mode is set', async () => {
+    writeProjectPreferences(dir, {
+      git: 'extra help',
+      siteglideCli: 'extra help'
     });
+    const status = await getTargetAudience({ projectDir: dir });
     assert.equal(status.complete, true);
+    assert.equal(status.readOnly, true);
     assert.equal(status.path, preferencesPath(dir));
-    assert.equal(status.target_audience.role, 'designer');
+    assert.equal(status.target_audience.git, 'extra help');
+    assert.equal(status.target_audience.siteglideCli, 'extra help');
     assert.equal(status.languageGuidance.git.defineWhenSpeaking.repo.includes('folder'), true);
     assert.equal(status.languageGuidance.siteglideCli.defineWhenSpeaking.sync.includes('watches'), true);
-    assert.equal(status.languageGuidance.role, 'designer');
     const onDisk = JSON.parse(readFileSync(preferencesPath(dir), 'utf8'));
     assert.equal(onDisk.target_audience.git, 'extra help');
     const again = readProjectPreferences(dir);
     assert.equal(again.target_audience.siteglideCli, 'extra help');
   });
 
-  it('accepts legacy beginner and advanced answers as aliases', async () => {
-    const status = await getTargetAudience({
-      projectDir: dir,
-      answers: {
-        role: 'developer',
-        git: 'beginner',
-        siteglideCli: 'advanced'
-      }
+  it('accepts legacy beginner and advanced on disk as aliases', async () => {
+    writeProjectPreferences(dir, {
+      git: 'beginner',
+      siteglideCli: 'advanced'
     });
+    const status = await getTargetAudience({ projectDir: dir });
     assert.equal(status.complete, true);
     assert.equal(status.target_audience.git, 'extra help');
     assert.equal(status.target_audience.siteglideCli, 'familiar');

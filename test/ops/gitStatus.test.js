@@ -74,9 +74,10 @@ describe('gitStatus pull baseline', () => {
 });
 
 describe('gitStatus audienceGuidance', () => {
-  it('requires audience before git explanations', () => {
-    assert.match(GIT_AUDIENCE_GUIDANCE, /audience tool/);
+  it('points agents at read-only audience before git explanations', () => {
+    assert.match(GIT_AUDIENCE_GUIDANCE, /read-only/);
     assert.match(GIT_AUDIENCE_GUIDANCE, /languageGuidance/);
+    assert.match(GIT_AUDIENCE_GUIDANCE, /siteglide-cli pull/);
   });
 
   it('includes audienceGuidance and prefixes guidance for repos without remotes', () => {
@@ -85,7 +86,7 @@ describe('gitStatus audienceGuidance', () => {
       gitInit(projectDir);
       const status = getGitStatus({ projectDir });
       assert.equal(status.audienceGuidance, GIT_AUDIENCE_GUIDANCE);
-      assert.match(status.guidance, /^Before explaining git/);
+      assert.match(status.guidance, /^Call the Siteglide MCP audience tool \(read-only\)/);
     } finally {
       rmSync(projectDir, { recursive: true, force: true });
     }

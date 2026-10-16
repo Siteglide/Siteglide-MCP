@@ -52,6 +52,18 @@ function emptyAudience() {
   return { role: null, git: null, siteglideCli: null };
 }
 
+function pairExperienceFields(audience) {
+  const git = audience.git == null ? null : audience.git;
+  const siteglideCli = audience.siteglideCli == null ? null : audience.siteglideCli;
+  if (git != null && siteglideCli == null) {
+    return { ...audience, siteglideCli: git };
+  }
+  if (siteglideCli != null && git == null) {
+    return { ...audience, git: siteglideCli };
+  }
+  return audience;
+}
+
 /**
  * @param {unknown} value
  * @param {string[]} allowed
@@ -80,7 +92,7 @@ export function readProjectPreferences(projectDir) {
       ? data.target_audience
       : {};
     return {
-      target_audience: canonicalizeTargetAudienceExperience(ta)
+      target_audience: pairExperienceFields(canonicalizeTargetAudienceExperience(ta))
     };
   } catch {
     return fallback;
@@ -113,14 +125,12 @@ export function writeProjectPreferences(projectDir, audience) {
  * @param {{ role: string|null, git: string|null, siteglideCli: string|null }} audience
  */
 export function missingAudienceFields(audience) {
+  const paired = pairExperienceFields(audience);
   const missing = [];
-  if (audience.role == null) {
-    missing.push('role');
-  }
-  if (audience.git == null) {
+  if (paired.git == null) {
     missing.push('git');
   }
-  if (audience.siteglideCli == null) {
+  if (paired.siteglideCli == null) {
     missing.push('siteglideCli');
   }
   return missing;
@@ -136,7 +146,7 @@ export function buildLanguageGuidance(audience) {
   return {
     role: audience.role,
     roleInstruction:
-      'The user\'s overall role is provided for context. Interpret it yourself when choosing tone, examples, and how much CMS vs code detail to include.',
+      'The user\'s overall role is provided for context when set. Do not ask the user to choose a role — CLI pull collects help mode only.',
     git: {
       level: audience.git,
       defineWhenSpeaking: gitExtraHelp ? GIT_DEFINITIONS : null,
@@ -154,130 +164,33 @@ export function buildLanguageGuidance(audience) {
   };
 }
 
-function isFormCapabilityError(error) {
-  const msg = error?.message || String(error);
-  return /does not support form elicitation/i.test(msg);
-}
-
 /**
- * Prompt via MCP form elicitation when fields are null.
- * @param {import('@modelcontextprotocol/sdk/server/mcp.js').McpServer} mcpServer
- * @param {string[]} missing
- */
-async function elicitAudienceForm(mcpServer, missing) {
-  const properties = {};
-  if (missing.includes('role')) {
-    properties.role = {
-      type: 'string',
-      title: 'Your role',
-      description: 'Which best describes you?',
-      enum: ROLE_OPTIONS
-    };
-  }
-  if (missing.includes('git')) {
-    properties.git = {
-      type: 'string',
-      title: 'Git explanations',
-      description: 'When we explain git (local version control, not GitHub), do you want extra help with terms or are you familiar?',
-      enum: EXPERIENCE_OPTIONS
-    };
-  }
-  if (missing.includes('siteglideCli')) {
-    properties.siteglideCli = {
-      type: 'string',
-      title: 'Siteglide CLI explanations',
-      description: 'When we explain Siteglide CLI (pull, sync, deploy), do you want extra help or are you familiar?',
-      enum: EXPERIENCE_OPTIONS
-    };
-  }
-
-  const result = await mcpServer.server.elicitInput({
-    mode: 'form',
-    message:
-      'Tell Siteglide how you work so the assistant can match your experience. ' +
-      'Pick a role and for git and Siteglide CLI choose extra help or familiar.',
-    requestedSchema: {
-      type: 'object',
-      properties,
-      required: missing
-    }
-  });
-
-  if (result.action !== 'accept' || !result.content) {
-    return { ok: false, reason: `User ${result.action || 'dismissed'} target-audience prompt.` };
-  }
-
-  return { ok: true, content: result.content };
-}
-
-/**
- * @param {{
- *   projectDir: string,
- *   server?: import('@modelcontextprotocol/sdk/server/mcp.js').McpServer,
- *   answers?: { role?: string, git?: string, siteglideCli?: string }
- * }} opts
+ * Read-only: return saved audience and language guidance. Does not write or prompt the user.
+ * @param {{ projectDir: string }} opts
  */
 export async function getTargetAudience(opts) {
-  const { projectDir, server, answers = {} } = opts;
-  const current = readProjectPreferences(projectDir).target_audience;
+  const { projectDir } = opts;
+  const applied = readProjectPreferences(projectDir).target_audience;
+  const missing = missingAudienceFields(applied);
+  const complete = missing.length === 0;
+  const path = preferencesPath(projectDir);
 
-  const applied = {
-    role: normalizeChoice(answers.role, ROLE_OPTIONS) ?? current.role,
-    git: normalizeExperienceLevel(answers.git) ?? current.git,
-    siteglideCli: normalizeExperienceLevel(answers.siteglideCli) ?? current.siteglideCli
+  const base = {
+    complete,
+    path,
+    target_audience: applied,
+    languageGuidance: buildLanguageGuidance(applied),
+    readOnly: true
   };
 
-  let missing = missingAudienceFields(applied);
-  let elicitError = null;
-
-  if (missing.length && server) {
-    try {
-      const elicited = await elicitAudienceForm(server, missing);
-      if (elicited.ok) {
-        applied.role = normalizeChoice(elicited.content.role, ROLE_OPTIONS) ?? applied.role;
-        applied.git = normalizeExperienceLevel(elicited.content.git) ?? applied.git;
-        applied.siteglideCli = normalizeExperienceLevel(elicited.content.siteglideCli) ?? applied.siteglideCli;
-        missing = missingAudienceFields(applied);
-      } else {
-        elicitError = elicited.reason;
-      }
-    } catch (error) {
-      if (!isFormCapabilityError(error)) {
-        elicitError = error?.message || String(error);
-      } else {
-        elicitError = 'Client does not support form elicitation; ask in chat, then call this tool with answers.';
-      }
-    }
-  }
-
-  if (!missing.length) {
-    const written = writeProjectPreferences(projectDir, applied);
-    return {
-      complete: true,
-      path: written.path,
-      target_audience: written.preferences.target_audience,
-      languageGuidance: buildLanguageGuidance(written.preferences.target_audience),
-      options: { role: ROLE_OPTIONS, git: EXPERIENCE_OPTIONS, siteglideCli: EXPERIENCE_OPTIONS }
-    };
+  if (complete) {
+    return base;
   }
 
   return {
-    complete: false,
-    path: preferencesPath(projectDir),
-    target_audience: applied,
+    ...base,
     missing,
-    elicitError,
-    prompt: {
-      message:
-        'Please choose your role and experience so the assistant can match how it explains git and Siteglide CLI.',
-      fields: {
-        role: { options: ROLE_OPTIONS, current: applied.role },
-        git: { options: EXPERIENCE_OPTIONS, current: applied.git },
-        siteglideCli: { options: EXPERIENCE_OPTIONS, current: applied.siteglideCli }
-      }
-    },
-    nextStep:
-      'Ask the user (MCP form if available, otherwise chat) for each missing field using prompt.fields[].options, ' +
-      'then call audience again with role, git, and siteglideCli set. Do not invent answers.'
+    hint:
+      'Help mode is unset. Do not ask the user profile questions in chat — run siteglide-cli pull (interactive) or edit about-me.json. Use languageGuidance with familiar defaults until then.'
   };
 }
