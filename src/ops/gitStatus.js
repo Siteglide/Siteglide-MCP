@@ -44,8 +44,24 @@ export const SITEGLIDE_USER_GITIGNORE_INSTRUCTION =
   'If anything under `.siteglide/user/` is still tracked after updating `.gitignore`, run `git rm -r --cached .siteglide/user/` and commit. ' +
   'If `.gitignore` currently lists `.siteglide/`, replace it with `.siteglide/user/` so project settings stay shareable.';
 
+/** Written by siteglide-cli merge-first before it leaves the home branch (see lib/git/homeBranch.js). */
+export const HOME_BRANCH_FILE = '.siteglide/user/git/home-branch.json';
+
+/** Branch names siteglide-cli merge-first creates (see tempBranchNameForMode in lib/git/mergeFirst.js). */
+export const TEMPORARY_BRANCH_PATTERNS = [
+  /^temp-pull-from-/,
+  /^siteglide-merge-deploy\//,
+  /^siteglide-merge-sync\//
+];
+
+/** Mirrors OWNER_PID_MAX_AGE_MS in siteglide-cli: an older owner pid may belong to an unrelated process. */
+const OWNER_PID_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+
+const SNAPSHOT_COMMIT_PREFIX = 'siteglide: remote ';
+
 export const GIT_STATUS_TOOL_DESCRIPTION =
   'Probe git install, user.name/user.email, repo init, remotes, optional gh auth, and pull baseline (lastPullCommit) for this project. ' +
+  'When temporaryBranch.onTemporaryBranch is true, the user is stuck on a siteglide-cli "Pull and merge" temporary branch: follow temporaryBranch.rescueGuidance before anything else to return them to their home branch and finish or restart the merge. ' +
   'Call audience (read-only) for languageGuidance before explaining git. ' +
   'During git setup, always ensure `.gitignore` lists `.siteglide/user/` (entire folder and all files inside — local CLI runtime, not for remotes) and `.siteglide-config`; follow guidance, siteglideUserGitignoreInstruction, siteglideMetadataGitignore, and gitignoreEnsure in the tool result. ' +
   'If paths under `.siteglide/user/` are already tracked, untrack with `git rm -r --cached .siteglide/user/` before commit. Keep `.siteglide/project/` committable — do not gitignore all of `.siteglide/`. ' +
@@ -136,6 +152,187 @@ function getMergeConflictStatus(projectDir, run) {
     open,
     mergeInProgress,
     unmergedPaths
+  };
+}
+
+/**
+ * @param {string} projectDir
+ * @returns {object | null}
+ */
+export function readHomeBranchRecord(projectDir) {
+  try {
+    const data = JSON.parse(readFileSync(join(projectDir, ...HOME_BRANCH_FILE.split('/')), 'utf8'));
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {unknown} pid
+ * @returns {boolean}
+ */
+function isPidAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) {
+    return false;
+  }
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * @param {object} record
+ * @returns {boolean}
+ */
+function isOwnerStillRunning(record) {
+  const at = Date.parse(record.updatedAt || record.startedAt || '');
+  if (Number.isNaN(at) || Date.now() - at > OWNER_PID_MAX_AGE_MS) {
+    return false;
+  }
+  return isPidAlive(record.ownerPid);
+}
+
+/**
+ * @param {(bin: string, args: string[]) => { ok: boolean, stdout: string }} run
+ * @param {string} branch
+ * @returns {boolean}
+ */
+function branchExists(run, branch) {
+  return run('git', ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]).ok;
+}
+
+/**
+ * Agent-facing rescue steps for a user left on a merge-first temporary branch.
+ * @param {{
+ *   current: string,
+ *   homeBranch: string | null,
+ *   command: string,
+ *   environment: string | null,
+ *   phase: string | null,
+ *   mergeStrategy: string | null,
+ *   snapshotCommitted: boolean,
+ *   cliStillRunning: boolean
+ * }} info
+ * @returns {string}
+ */
+export function buildTemporaryBranchRescueGuidance(info) {
+  const env = info.environment || '<environment>';
+  const home = info.homeBranch;
+  const cliCommand = `siteglide-cli ${info.command} ${env}`;
+
+  if (info.cliStillRunning) {
+    return (
+      `The user is on ${info.current}, a temporary branch that ${cliCommand} is still using for "Pull and merge" — that CLI process is still running. ` +
+      'Do not switch branches, commit, or delete anything. Tell the user to wait for it to finish (or stop it with Ctrl+C in its terminal), then call git_status again.'
+    );
+  }
+
+  const homeLabel = home || 'their home branch';
+  const situation =
+    `The user is on ${info.current}, a temporary branch that ${cliCommand} created for "Pull and merge". ` +
+    `Their home branch (the branch they were working on) is ${home || 'not recorded'}. ` +
+    `"Pull and merge" is meant to download the live site's files onto this temporary branch, commit them as a snapshot, switch back to ${homeLabel}, ` +
+    'merge the snapshot in so any differences show up as normal git conflicts, and then delete the temporary branch. ' +
+    'The user is not meant to stay here or do new work on it. Their own work is safe: it was committed on the home branch before this branch was created. ' +
+    `Being here means the process stopped part-way (phase: ${info.phase || 'unknown'}). ` +
+    'Explain this to the user in plain language (follow audience languageGuidance) and get their go-ahead before changing anything. ';
+
+  const always =
+    `Always: never force-push, never delete ${homeLabel}, and never delete the temporary branch before its snapshot has been merged or deliberately discarded. ` +
+    'If a checkout is refused, stop and explain why rather than forcing it.';
+
+  if (!home) {
+    return (
+      situation +
+      `No home branch was recorded, so do not guess: use git reflog to find the branch that was checked out before ${info.current}, and confirm it with the user before switching. ` +
+      'Then follow the matching steps below once the home branch is known: if the latest commit here is not a "siteglide: remote ..." snapshot, discard and re-run; otherwise merge it into the home branch. ' +
+      always
+    );
+  }
+
+  if (!info.snapshotCommitted) {
+    return (
+      situation +
+      'The download did not finish (no snapshot commit), so do not merge this branch. ' +
+      'With the user\'s approval, discard the partial download here (git reset --hard, then git clean -fd — never -x, which would delete ignored files such as .siteglide-config), ' +
+      `then git checkout ${home} and git branch -D ${info.current}. ` +
+      `Then ask the user to run ${cliCommand} again and choose "Pull and merge". ` +
+      always
+    );
+  }
+
+  const allowUnrelated = info.mergeStrategy === 'orphan' ? ' --allow-unrelated-histories' : '';
+  return (
+    situation +
+    'The snapshot was committed, so finish what the CLI started: ' +
+    `git checkout ${home}, then git merge --no-ff${allowUnrelated} ${info.current}. ` +
+    'Resolve any conflicts using mergeResolutionGuidance — the user must approve each resolution before git add. ' +
+    `Once the merge is committed, git branch -D ${info.current}. ` +
+    `The CLI did not get to record the new pull baseline, so recommend running siteglide-cli pull ${env} once afterwards. ` +
+    always
+  );
+}
+
+/**
+ * Whether the user is on (or left behind) a merge-first temporary branch.
+ * @param {string} projectDir
+ * @param {(bin: string, args: string[]) => { ok: boolean, stdout: string }} run
+ */
+export function getTemporaryBranchStatus(projectDir, run) {
+  const head = run('git', ['rev-parse', '--abbrev-ref', 'HEAD']);
+  const current = head.ok && head.stdout && head.stdout !== 'HEAD' ? head.stdout : null;
+  const record = readHomeBranchRecord(projectDir);
+  const matchesRecord = Boolean(current && record && record.temporaryBranch === current);
+  const onTemporaryBranch = Boolean(
+    current && (matchesRecord || TEMPORARY_BRANCH_PATTERNS.some((pattern) => pattern.test(current)))
+  );
+
+  if (!onTemporaryBranch) {
+    if (record) {
+      const temporaryBranchStillExists = record.temporaryBranch ? branchExists(run, record.temporaryBranch) : false;
+      return {
+        onTemporaryBranch: false,
+        current,
+        homeBranch: record.homeBranch || null,
+        temporaryBranch: record.temporaryBranch || null,
+        temporaryBranchStillExists,
+        stale: current === record.homeBranch && !temporaryBranchStillExists,
+        homeBranchFile: HOME_BRANCH_FILE
+      };
+    }
+    return { onTemporaryBranch: false, current };
+  }
+
+  const usable = matchesRecord ? record : null;
+  const homeBranch = usable?.homeBranch || null;
+  const lastSubject = run('git', ['log', '-1', '--format=%s']);
+  const snapshotCommitted = lastSubject.ok && lastSubject.stdout.startsWith(SNAPSHOT_COMMIT_PREFIX);
+  const porcelain = run('git', ['status', '--porcelain']);
+  const info = {
+    current,
+    homeBranch,
+    command: usable?.command || 'pull',
+    environment: usable?.environment || null,
+    phase: usable?.phase || null,
+    mergeStrategy: usable?.mergeStrategy || null,
+    snapshotCommitted,
+    cliStillRunning: usable ? isOwnerStillRunning(usable) : false
+  };
+
+  return {
+    onTemporaryBranch: true,
+    ...info,
+    homeBranchExists: homeBranch ? branchExists(run, homeBranch) : false,
+    workingTreeDirty: porcelain.ok ? porcelain.stdout.length > 0 : null,
+    homeBranchFile: HOME_BRANCH_FILE,
+    rescueGuidance: buildTemporaryBranchRescueGuidance(info)
   };
 }
 
@@ -292,6 +489,11 @@ export function getGitStatus(opts) {
     guidance = `${MERGE_CONFLICT_RESOLUTION_GUIDANCE} ${guidance}`;
   }
 
+  const temporaryBranch = repoInitialized ? getTemporaryBranchStatus(cwd, run) : undefined;
+  if (temporaryBranch?.onTemporaryBranch) {
+    guidance = `${temporaryBranch.rescueGuidance} ${guidance}`;
+  }
+
   return {
     installed,
     identityConfigured,
@@ -325,6 +527,7 @@ export function getGitStatus(opts) {
         }
       : undefined,
     mergeResolutionGuidance,
+    temporaryBranch,
     pullBaseline,
     needsPullBaseline: pullBaseline?.needsPullBaseline,
     pullBaselineGuidance,

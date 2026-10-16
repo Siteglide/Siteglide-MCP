@@ -11,7 +11,9 @@ import {
   GIT_STATUS_TOOL_DESCRIPTION,
   MERGE_CONFLICT_RESOLUTION_GUIDANCE,
   REMOTE_SETUP_GUIDANCE,
-  SITEGLIDE_USER_GITIGNORE_INSTRUCTION
+  SITEGLIDE_USER_GITIGNORE_INSTRUCTION,
+  HOME_BRANCH_FILE,
+  buildTemporaryBranchRescueGuidance
 } from '../../src/ops/gitStatus.js';
 import { spawnSync } from 'node:child_process';
 
@@ -148,6 +150,133 @@ describe('gitStatus siteglide user gitignore', () => {
     } finally {
       rmSync(projectDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('gitStatus temporaryBranch', () => {
+  const TEMP = 'temp-pull-from-staging-2026-10-16-1453';
+  let projectDir;
+
+  const git = (args) => {
+    const res = spawnSync('git', args, { cwd: projectDir, encoding: 'utf8', windowsHide: true });
+    assert.equal(res.status, 0, res.stderr);
+  };
+
+  const commit = (file, content, message) => {
+    writeFileSync(join(projectDir, file), content);
+    git(['add', '-A']);
+    git(['commit', '-m', message]);
+  };
+
+  const writeRecord = (overrides = {}) => {
+    const filePath = join(projectDir, ...HOME_BRANCH_FILE.split('/'));
+    mkdirSync(join(filePath, '..'), { recursive: true });
+    const now = new Date().toISOString();
+    writeFileSync(filePath, JSON.stringify({
+      homeBranch: 'main',
+      temporaryBranch: TEMP,
+      command: 'deploy',
+      environment: 'staging',
+      mergeStrategy: 'last_pull_base',
+      ownerPid: 999999999,
+      phase: 'pulling',
+      startedAt: now,
+      updatedAt: now,
+      ...overrides
+    }));
+  };
+
+  beforeEach(() => {
+    projectDir = mkdtempSync(join(tmpdir(), 'sg-git-status-temp-'));
+    gitInit(projectDir);
+    commit('.gitignore', '.siteglide/user/\n.siteglide-config\n', 'base');
+  });
+
+  afterEach(() => {
+    rmSync(projectDir, { recursive: true, force: true });
+  });
+
+  it('reports the home branch and discard-and-rerun rescue when the snapshot was not committed', () => {
+    git(['checkout', '-b', TEMP]);
+    writeRecord();
+    const status = getGitStatus({ projectDir });
+    const expectedGuidance = buildTemporaryBranchRescueGuidance({
+      current: TEMP,
+      homeBranch: 'main',
+      command: 'deploy',
+      environment: 'staging',
+      phase: 'pulling',
+      mergeStrategy: 'last_pull_base',
+      snapshotCommitted: false,
+      cliStillRunning: false
+    });
+    assert.deepEqual(status.temporaryBranch, {
+      onTemporaryBranch: true,
+      current: TEMP,
+      homeBranch: 'main',
+      command: 'deploy',
+      environment: 'staging',
+      phase: 'pulling',
+      mergeStrategy: 'last_pull_base',
+      snapshotCommitted: false,
+      cliStillRunning: false,
+      homeBranchExists: true,
+      workingTreeDirty: false,
+      homeBranchFile: HOME_BRANCH_FILE,
+      rescueGuidance: expectedGuidance
+    });
+    assert.equal(status.guidance.startsWith(expectedGuidance), true);
+    assert.match(expectedGuidance, /git checkout main and git branch -D temp-pull-from-staging-2026-10-16-1453/);
+    assert.match(expectedGuidance, /siteglide-cli deploy staging again/);
+  });
+
+  it('tells the agent to finish the merge once the snapshot is committed', () => {
+    git(['checkout', '-b', TEMP]);
+    commit('remote.txt', 'remote\n', 'siteglide: remote full pull for merge-first deploy');
+    writeRecord({ phase: 'snapshot_committed', mergeStrategy: 'orphan' });
+    const status = getGitStatus({ projectDir });
+    assert.equal(status.temporaryBranch.snapshotCommitted, true);
+    assert.match(
+      status.temporaryBranch.rescueGuidance,
+      /git checkout main, then git merge --no-ff --allow-unrelated-histories temp-pull-from-staging-2026-10-16-1453/
+    );
+  });
+
+  it('says wait when the owning CLI process is still running', () => {
+    git(['checkout', '-b', TEMP]);
+    writeRecord({ ownerPid: process.pid });
+    const status = getGitStatus({ projectDir });
+    assert.equal(status.temporaryBranch.cliStillRunning, true);
+    assert.match(status.temporaryBranch.rescueGuidance, /that CLI process is still running/);
+  });
+
+  it('uses reflog advice when a temp-named branch has no record', () => {
+    git(['checkout', '-b', 'siteglide-merge-sync/1-2']);
+    const status = getGitStatus({ projectDir });
+    assert.equal(status.temporaryBranch.onTemporaryBranch, true);
+    assert.equal(status.temporaryBranch.homeBranch, null);
+    assert.match(status.temporaryBranch.rescueGuidance, /use git reflog/);
+  });
+
+  it('marks a leftover record stale once the user is home and the temp branch is gone', () => {
+    writeRecord();
+    const status = getGitStatus({ projectDir });
+    assert.deepEqual(status.temporaryBranch, {
+      onTemporaryBranch: false,
+      current: 'main',
+      homeBranch: 'main',
+      temporaryBranch: TEMP,
+      temporaryBranchStillExists: false,
+      stale: true,
+      homeBranchFile: HOME_BRANCH_FILE
+    });
+    assert.equal(status.guidance.includes('temporary branch'), false);
+  });
+
+  it('reports nothing special on a normal branch', () => {
+    git(['checkout', '-b', 'feature/header']);
+    const status = getGitStatus({ projectDir });
+    assert.deepEqual(status.temporaryBranch, { onTemporaryBranch: false, current: 'feature/header' });
   });
 });
 
