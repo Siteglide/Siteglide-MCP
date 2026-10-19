@@ -9,10 +9,13 @@ import {
   assertPayloadSize
 } from './security.js';
 import { elicitProductionMutationConfirm } from './elicitConfirm.js';
-import { getGitStatus } from './gitStatus.js';
-// import { join } from 'node:path';
-// import { getSyncStatus } from './syncStatus.js';
-// import { getRemoteCheckStatus } from './remoteCheckStatus.js';
+import { join } from 'node:path';
+import { getGitStatus, GIT_STATUS_TOOL_DESCRIPTION } from './gitStatus.js';
+import { getSyncStatus } from './syncStatus.js';
+import { getSyncErrors } from './syncErrors.js';
+import { listInstalledModules } from './installedModules.js';
+import { getTargetAudience } from './targetAudience.js';
+import { getRemoteCheckStatus } from './remoteCheckStatus.js';
 
 function toolResult(data) {
   return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
@@ -59,42 +62,39 @@ export function registerOpsTools(server, opts = {}) {
     }
   );
 
-  // Uncomment when siteglide-cli writes .siteglide/sync, remote-check, merge, and git status files.
-  // server.registerTool(
-  //   'remote_check_status',
-  //   {
-  //     description:
-  //       'Read Siteglide CLI remote-mtime / merge-first / stash-pop conflict logs under .siteglide/ for this project. ' +
-  //       'Prefer this over IDE terminal scrollback when sync or deploy warns about remote conflicts. ' +
-  //       'recommendedActions[].id values are stable for agent branching (e.g. merge_first, resolve_conflicts).',
-  //     inputSchema: {
-  //       environment: z
-  //         .string()
-  //         .optional()
-  //         .describe('Optional environment name; omit to list all conflict logs')
-  //     }
-  //   },
-  //   async (args) => {
-  //     try {
-  //       const status = getRemoteCheckStatus({
-  //         projectDir,
-  //         environment: args?.environment
-  //       });
-  //       log(`remote_check_status: activeConflict=${status.activeConflict}`);
-  //       return toolResult(status);
-  //     } catch (error) {
-  //       return toolError(error);
-  //     }
-  //   }
-  // );
+  server.registerTool(
+    'remote_check_status',
+    {
+      description:
+        'Read Siteglide CLI remote-mtime / merge-first / stash-pop conflict logs under .siteglide/user/ for this project. ' +
+        'Prefer this over IDE terminal scrollback when sync or deploy warns about remote conflicts. ' +
+        'Follow mergeResolutionGuidance: resolve markers, get user verbal approval, then git add — never git add before approval. CLI auto-commits when staged. ' +
+        'recommendedActions[].id values are stable for agent branching (e.g. merge_first, resolve_conflicts, commit_then_pull).',
+      inputSchema: {
+        environment: z
+          .string()
+          .optional()
+          .describe('Optional environment name; omit to list all conflict logs')
+      }
+    },
+    async (args) => {
+      try {
+        const status = getRemoteCheckStatus({
+          projectDir,
+          environment: args?.environment
+        });
+        log(`remote_check_status: activeConflict=${status.activeConflict}`);
+        return toolResult(status);
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
 
   server.registerTool(
     'git_status',
     {
-      description:
-        'Probe git install, user.name/user.email, repo init, remotes, and optional gh auth for this project. ' +
-        'If needsSetupWizard is true, elicit whether the user wants guided setup (install git, identity, git init; remote optional). ' +
-        'Specialize in setup and conflict recovery; CLI owns routine pull/deploy git prompts.',
+      description: GIT_STATUS_TOOL_DESCRIPTION,
       inputSchema: {}
     },
     async () => {
@@ -108,36 +108,136 @@ export function registerOpsTools(server, opts = {}) {
     }
   );
 
-  // Uncomment with remote_check_status when CLI writes .siteglide/sync/<pid>.json.
-  // server.registerTool(
-  //   'sync_status',
-  //   {
-  //     description:
-  //       'Report whether siteglide-cli sync/watch is active for this MCP project directory. ' +
-  //       'Aggregates all live syncs (different envs may run together). ' +
-  //       'Use treatAsProduction: if true, follow production sync safety elicitation before editing. ' +
-  //       'Clears stale status files whose process pid is no longer alive. ' +
-  //       'Do not infer sync from IDE terminal metadata.',
-  //     inputSchema: {}
-  //   },
-  //   async () => {
-  //     try {
-  //       const status = getSyncStatus({
-  //         projectDir,
-  //         configPath:
-  //           !opts.configPath && !process.env.CONFIG_FILE_PATH
-  //             ? join(projectDir, '.siteglide-config')
-  //             : configPath
-  //       });
-  //       log(
-  //         `sync_status: active=${status.active} treatAsProduction=${status.treatAsProduction} syncs=${status.syncs.length}`
-  //       );
-  //       return toolResult(status);
-  //     } catch (error) {
-  //       return toolError(error);
-  //     }
-  //   }
-  // );
+  server.registerTool(
+    'audience',
+    {
+      description:
+        'Read-only: `../.siteglide/user/about-me.json` target_audience (git and Siteglide CLI help mode). ' +
+        'Call early for languageGuidance. Does not write the file or ask the user questions — siteglide-cli pull sets help mode once. ' +
+        'When complete, follow languageGuidance. If incomplete, use hint and do not interrogate the user.',
+      inputSchema: {}
+    },
+    async () => {
+      try {
+        const status = await getTargetAudience({
+          projectDir
+        });
+        log(`audience: complete=${status.complete} missing=${(status.missing || []).join(',')}`);
+        return toolResult(status);
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'sync_status',
+    {
+      description:
+        'Report whether siteglide-cli sync/watch is active for this MCP project directory. ' +
+        'Aggregates all live syncs (different envs may run together). ' +
+        'Use treatAsProduction: if true, follow production sync safety elicitation before editing. ' +
+        'Clears stale status files whose process pid is no longer alive. ' +
+        'Do not infer sync from IDE terminal metadata.',
+      inputSchema: {}
+    },
+    async () => {
+      try {
+        const status = getSyncStatus({
+          projectDir,
+          configPath:
+            !opts.configPath && !process.env.CONFIG_FILE_PATH
+              ? join(projectDir, '.siteglide-config')
+              : configPath
+        });
+        log(
+          `sync_status: active=${status.active} treatAsProduction=${status.treatAsProduction} syncs=${status.syncs.length}`
+        );
+        return toolResult(status);
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'sync_errors',
+    {
+      description:
+        'Read Siteglide sync validation and API upload failures recorded by siteglide-cli watch. ' +
+        'Sources .siteglide/user/sync/{pid}.json syncErrors while that sync process is still alive. ' +
+        'Use with sync_status to see active watches. Optional since/until filter error at timestamps (ISO 8601). ' +
+        'Does not scrape the terminal and does not delete stale pid files.',
+      inputSchema: {
+        since: z
+          .string()
+          .optional()
+          .describe('Include errors where at >= since (ISO 8601 date-time)'),
+        until: z
+          .string()
+          .optional()
+          .describe('Include errors where at <= until (ISO 8601 date-time)'),
+        environment: z
+          .string()
+          .optional()
+          .describe('Restrict to one environment name from .siteglide-config')
+      }
+    },
+    async (args) => {
+      try {
+        const result = getSyncErrors({
+          projectDir,
+          configPath:
+            !opts.configPath && !process.env.CONFIG_FILE_PATH
+              ? join(projectDir, '.siteglide-config')
+              : configPath,
+          since: args?.since,
+          until: args?.until,
+          environment: args?.environment
+        });
+        log(`sync_errors: activeSyncs=${result.activeSyncs} errors=${result.errors.length}`);
+        return toolResult(result);
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'modules_list',
+    {
+      description:
+        'List module machine names installed on a Siteglide site. ' +
+        'Reads `.siteglide/project/modules.json` `installed.<env>` when fresh (last_checked within 2 hours); ' +
+        'otherwise GET /cli/list_modules (same as siteglide-cli pull/modules) and writes the cache. ' +
+        'Reuse cached results within a session — call refresh: true only after the user installs or removes a module. ' +
+        'Call envs_list({ details: true }) first.',
+      annotations: { openWorldHint: true },
+      inputSchema: {
+        environment: z.string().describe('Environment name from .siteglide-config'),
+        refresh: z
+          .boolean()
+          .optional()
+          .describe(
+            'When true, bypass the 2-hour cache and fetch live from the site, then update `.siteglide/project/modules.json`.'
+          )
+      }
+    },
+    async (args) => {
+      try {
+        const result = await listInstalledModules({
+          environment: args.environment,
+          configPath,
+          projectDir,
+          refresh: Boolean(args?.refresh)
+        });
+        log(`modules_list: ${args.environment} count=${result.count} cached=${result.cached}`);
+        return toolResult(result);
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
 
   server.registerTool(
     'graphql_exec',
