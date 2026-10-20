@@ -1,7 +1,7 @@
 {
   "name": "@siteglide/siteglide-mcp",
   "version": "1.0.0",
-  "description": "Siteglide MCP server — compose platformOS validate_code with Siteglide rules and ops tools",
+  "description": "Siteglide CLI MCP server, to help machine-based AI assistants write code on your machine to build and maintain website projects and to read and write data from your specific site. Operates with stdio over the command line. A web-based MCP will be available separately as the main Siteglide MCP in future.",
   "type": "module",
   "main": "src/index.js",
   "exports": {
