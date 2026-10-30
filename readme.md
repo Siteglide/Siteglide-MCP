@@ -1,6 +1,6 @@
 # Siteglide MCP
 
-Experimental **Siteglide MCP server** for desktop AI agents (Cursor, Claude Code, VS Code, Windsurf). HTTP/Docker for browser agents is deferred.
+**Siteglide local MCP server** for desktop AI agents (Cursor, Claude Code, VS Code, Windsurf). HTTP/Docker for browser agents is deferred.
 
 ## Capabilities (stdio / desktop)
 
